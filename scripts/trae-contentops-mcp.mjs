@@ -4,7 +4,14 @@
  * Exposes topic generation and content drafting tools to TRAE IDE.
  */
 
-const API_URL = process.env.CONTENTOPS_API_URL || 'http://localhost:3000'
+const API_URL = (process.env.CONTENTOPS_API_URL || 'http://localhost:3000').replace(/\/$/, '')
+const MCP_SECRET = process.env.CONTENTOPS_MCP_SECRET?.trim()
+
+const MCP_HEADERS = {
+  'Content-Type': 'application/json',
+  'X-ContentOps-MCP': '1',
+  ...(MCP_SECRET ? { 'X-ContentOps-MCP-Key': MCP_SECRET } : {}),
+}
 
 const TOOLS = [
   {
@@ -144,7 +151,7 @@ const TOOLS = [
 async function callEndpoint(path, payload = {}) {
   const res = await fetch(`${API_URL}${path}`, {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: MCP_HEADERS,
     body: JSON.stringify(payload),
   })
   const json = await res.json()
@@ -209,6 +216,7 @@ async function handleMessage(msg) {
   const { id, method, params } = msg
 
   if (method === 'initialize') {
+    console.error(`[contentops-mcp] API: ${API_URL}`)
     send({
       jsonrpc: '2.0',
       id,

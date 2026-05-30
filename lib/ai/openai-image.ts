@@ -279,4 +279,10 @@ export async function withOpenAIImage<T>(
   generator: () => Promise<T>,
 ): Promise<{ result: T; live: true }> {
   if (!hasOpenAIImage()) {
-    throw new Error('OPENAI_API_KEY is required for OpenAI image generation. Add it to your .env
+    throw new Error('OPENAI_API_KEY is required for OpenAI image generation. Add it to your .env.local file.')
+  }
+  const result = await generator()
+  return { result, live: true }
+}
+
+export { OPENAI_MODEL, OPENAI_MODEL_QUALITY }

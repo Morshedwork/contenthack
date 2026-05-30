@@ -1,0 +1,12 @@
+{
+  "mcpServers": {
+    "contentops-ai": {
+      "command": "node",
+      "args": ["scripts/trae-contentops-mcp.mjs"],
+      "env": {
+        "CONTENTOPS_API_URL": "https://your-app.vercel.app",
+        "CONTENTOPS_MCP_SECRET": "generate-a-long-random-secret-and-set-the-same-value-on-vercel"
+      }
+    }
+  }
+}

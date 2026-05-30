@@ -67,7 +67,21 @@ In a second terminal:
 npm run mcp:contentops
 ```
 
-The MCP bridge calls `POST /api/trae/solo` on your running Next dev server (default `http://localhost:3000`).
+The MCP bridge calls your API with `X-ContentOps-MCP: 1`. In **development**, MCP tools use the demo workspace without a browser session. For a **deployed** API, set a shared secret (see below).
+
+### After deploying (Vercel)
+
+MCP still runs in **TRAE on your machine** — it is not hosted on Vercel. It calls your deployed Next.js API over HTTPS.
+
+1. **Vercel** → Project → Settings → Environment Variables:
+   - `OPENAI_API_KEY` (and other keys you need)
+   - `CONTENTOPS_MCP_SECRET` = a long random string (e.g. `openssl rand -hex 32`)
+2. **TRAE** → copy `.trae/mcp.production.example.json` into `.trae/mcp.json` (or merge `env`):
+   - `CONTENTOPS_API_URL` = `https://your-app.vercel.app`
+   - `CONTENTOPS_MCP_SECRET` = same value as on Vercel
+3. Redeploy, reload MCP in TRAE, run `npm run dev` only if you also want local API.
+
+Without `CONTENTOPS_MCP_SECRET` on production, MCP calls return **Unauthorized** (by design).
 
 ## Environment Variables
 
@@ -79,7 +93,9 @@ The MCP bridge calls `POST /api/trae/solo` on your running Next dev server (defa
 | `OPENAI_API_KEY` | OpenAI API key — powers all AI generation. Without it the app falls back to demo data |
 | `OPENAI_MODEL` | Default OpenAI model for most tasks (default: `gpt-4o-mini`) |
 | `OPENAI_MODEL_QUALITY` | Higher-quality model for research & safety (default: `gpt-4o`) |
-| `CONTENTOPS_API_URL` | Base URL for the local API that the MCP bridge calls (default: `http://localhost:3000`) |
+| `CONTENTOPS_API_URL` | Base URL for the MCP bridge (`.trae/mcp.json` or TRAE MCP env) |
+| `CONTENTOPS_MCP_SECRET` | Shared secret for production MCP (set on Vercel **and** in TRAE MCP `env`) |
+| `CONTENTOPS_MCP_ALLOW_ANONYMOUS` | If `true`, MCP works without secret (not recommended on public URLs) |
 
 ## Agent Architecture
 

@@ -3,6 +3,7 @@ import { generateContentDrafts } from '@/lib/ai/generate'
 import { withOpenAI } from '@/lib/ai/openai'
 import { runTraeSoloTopicGeneration, TRAE_SOLO_CAPABILITIES, validateTopicBrief } from '@/lib/trae/solo'
 import { MODEL_TASK, resolveTaskModel } from '@/lib/models/routing'
+import { resolveMcpWorkspaceContext } from '@/lib/mcp/access'
 import { getWorkspace, patchWorkspace } from '@/lib/workspace/store'
 import type { GeneratedTopic, Platform } from '@/types'
 
@@ -23,7 +24,8 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as TraeSoloRequest
     const action = body.action || 'generate_topics'
-    const ws = await getWorkspace()
+    const ctx = await resolveMcpWorkspaceContext(request)
+    const ws = await getWorkspace(ctx)
 
     switch (action) {
       case 'capabilities':
@@ -34,13 +36,16 @@ export async function POST(request: Request) {
         validateTopicBrief(body.brief)
         const modelConfig = resolveTaskModel(MODEL_TASK.CONTENT_GENERATION, ws.modelRouting)
         const result = await runTraeSoloTopicGeneration({ ...body.brief, modelConfig })
-        await patchWorkspace({
-          topics: result.topics,
-          campaign: {
-            ...ws.campaign,
-            platforms: body.brief.platforms?.length ? body.brief.platforms : ws.campaign.platforms,
+        await patchWorkspace(
+          {
+            topics: result.topics,
+            campaign: {
+              ...ws.campaign,
+              platforms: body.brief.platforms?.length ? body.brief.platforms : ws.campaign.platforms,
+            },
           },
-        })
+          ctx,
+        )
         return apiSuccess(result)
       }
 
@@ -71,7 +76,7 @@ export async function POST(request: Request) {
         )
 
         if (drafts.length) {
-          await patchWorkspace({ contentDrafts: [...drafts, ...ws.contentDrafts] })
+          await patchWorkspace({ contentDrafts: [...drafts, ...ws.contentDrafts] }, ctx)
         }
 
         return apiSuccess({

@@ -2,12 +2,14 @@ import { apiFromError, apiSuccess } from '@/lib/api-utils'
 import { withOpenAI } from '@/lib/ai/openai'
 import { generateResearch } from '@/lib/ai/generate'
 import { MODEL_TASK, resolveTaskModel } from '@/lib/models/routing'
+import { resolveMcpWorkspaceContext } from '@/lib/mcp/access'
 import { getWorkspace, patchWorkspace } from '@/lib/workspace/store'
 
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}))
-    const ws = await getWorkspace()
+    const ctx = await resolveMcpWorkspaceContext(request)
+    const ws = await getWorkspace(ctx)
     const modelConfig = resolveTaskModel(MODEL_TASK.MARKET_RESEARCH, ws.modelRouting)
 
     const { result: research, live } = await withOpenAI(() =>
@@ -22,7 +24,7 @@ export async function POST(request: Request) {
       }),
     )
 
-    await patchWorkspace({ research })
+    await patchWorkspace({ research }, ctx)
     return apiSuccess({ research, live })
   } catch (err) {
     return apiFromError(err, 'Research generation failed')

@@ -2,6 +2,7 @@ import { apiFromError, apiSuccess } from '@/lib/api-utils'
 import { withOpenAI } from '@/lib/ai/openai'
 import { generateContentDrafts } from '@/lib/ai/generate'
 import { MODEL_TASK, resolveTaskModel } from '@/lib/models/routing'
+import { resolveMcpWorkspaceContext } from '@/lib/mcp/access'
 import { getWorkspace, patchWorkspace } from '@/lib/workspace/store'
 import type { Platform } from '@/types'
 
@@ -30,7 +31,8 @@ function resolvePlatforms(bodyPlatforms: unknown, campaignPlatforms: Platform[])
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}))
-    const ws = await getWorkspace()
+    const ctx = await resolveMcpWorkspaceContext(request)
+    const ws = await getWorkspace(ctx)
     const platforms = resolvePlatforms(body.platforms, ws.campaign.platforms)
     const modelConfig = resolveTaskModel(MODEL_TASK.CONTENT_GENERATION, ws.modelRouting)
 
@@ -46,7 +48,7 @@ export async function POST(request: Request) {
       }),
     )
 
-    await patchWorkspace({ contentDrafts: drafts })
+    await patchWorkspace({ contentDrafts: drafts }, ctx)
     return apiSuccess({ drafts, live })
   } catch (err) {
     return apiFromError(err, 'Content generation failed')
