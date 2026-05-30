@@ -10,11 +10,19 @@ import { Label } from '@/components/ui/label'
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CustomPromptPanel } from '@/components/shared/custom-prompt-panel'
 import {
+  GPT_IMAGE_2_RESOLUTION_OPTIONS,
+  GPT_IMAGE_2_THINKING_OPTIONS,
+  GPT_IMAGE_QUALITY_OPTIONS,
   IMAGE_ASPECT_RATIOS,
   IMAGE_PROMPT_MODELS,
   OPENAI_RENDER_MODELS,
   POLLINATIONS_RENDER_MODELS,
   getImageRenderProvider,
+  isGptImage2RenderModel,
+  isGptImageRenderModel,
+  type GptImage2ResolutionId,
+  type GptImage2ThinkingId,
+  type GptImageQualityId,
   type ImageAspectRatioId,
   type ImagePromptModelId,
   type ImageRenderModelId,
@@ -29,20 +37,40 @@ import { toast } from 'sonner'
 export default function ImageStudioPage() {
   const { data, refresh } = useWorkspace()
   const [prompt, setPrompt] = useState('')
-  const [promptModel, setPromptModel] = useState<ImagePromptModelId>('kimi-k2.5')
-  const [renderModel, setRenderModel] = useState<ImageRenderModelId>('flux')
+  const [promptModel, setPromptModel] = useState<ImagePromptModelId>('gpt-4o')
+  const [renderModel, setRenderModel] = useState<ImageRenderModelId>('gpt-image-1.5')
   const [openaiQuality, setOpenaiQuality] = useState<'standard' | 'hd'>('standard')
+  const [gptImageQuality, setGptImageQuality] = useState<GptImageQualityId>('medium')
+  const [gptImage2Resolution, setGptImage2Resolution] = useState<GptImage2ResolutionId>('2k')
+  const [gptImageThinking, setGptImageThinking] = useState<GptImage2ThinkingId>('off')
   const [aspectRatio, setAspectRatio] = useState<ImageAspectRatioId>('1:1')
   const isOpenAIRender = getImageRenderProvider(renderModel) === 'openai'
+  const isGptImage = isGptImageRenderModel(renderModel)
+  const isGptImage2 = isGptImage2RenderModel(renderModel)
+  const showQualityControl = renderModel === 'dall-e-3' || isGptImage
+  const showGptImage2Controls = isGptImage2
   const [customPromptDetails, setCustomPromptDetails] = useState('')
   const [brandThemeId, setBrandThemeId] = useState('')
   const [images, setImages] = useState<GeneratedImage[]>([])
   const [loading, setLoading] = useState(false)
   const [latest, setLatest] = useState<GeneratedImage | null>(null)
+  const [hasOpenAI, setHasOpenAI] = useState(true)
 
   useEffect(() => {
     if (data?.generatedImages) setImages(data.generatedImages)
   }, [data?.generatedImages])
+
+  useEffect(() => {
+    void fetch('/api/media/providers')
+      .then((r) => r.json())
+      .then((json) => {
+        if (!json.success) return
+        setHasOpenAI(Boolean(json.data.openai))
+        if (json.data.defaultRenderModel) setRenderModel(json.data.defaultRenderModel)
+        if (json.data.defaultPromptModel) setPromptModel(json.data.defaultPromptModel)
+      })
+      .catch(() => {})
+  }, [])
 
   const handleGenerate = async () => {
     if (!prompt.trim()) {
@@ -60,6 +88,9 @@ export default function ImageStudioPage() {
           renderModel,
           aspectRatio,
           openaiQuality: isOpenAIRender && renderModel === 'dall-e-3' ? openaiQuality : undefined,
+          gptImageQuality: isOpenAIRender && isGptImage ? gptImageQuality : undefined,
+          gptImage2Resolution: isOpenAIRender && isGptImage2 ? gptImage2Resolution : undefined,
+          gptImageThinking: isOpenAIRender && isGptImage2 ? gptImageThinking : undefined,
           customPromptDetails: customPromptDetails.trim() || undefined,
           brandThemeId: brandThemeId && brandThemeId !== 'none' ? brandThemeId : undefined,
         }),
@@ -72,7 +103,7 @@ export default function ImageStudioPage() {
       toast.success(
         json.data.live
           ? `Image generated · ${renderModel} render`
-          : 'Demo image generated — set KIMI_API_KEY for live generation',
+          : 'Demo image generated — set OPENAI_API_KEY for live GPT Image generation',
       )
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to generate image')
@@ -95,7 +126,7 @@ export default function ImageStudioPage() {
         <div>
           <h1 className="text-2xl md:text-3xl font-display tracking-tight mb-1">Image Studio</h1>
           <p className="text-muted-foreground text-sm">
-            OpenAI (DALL·E 3, GPT Image) and Pollinations (Flux, Klein) — with Kimi or GPT prompt enhancement
+            GPT Image 2.0, GPT Image 1.5, and DALL·E via OpenAI API — with GPT-4o or Kimi prompt enhancement
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -130,7 +161,7 @@ export default function ImageStudioPage() {
               rows={3}
             />
           </div>
-          <div className={`grid grid-cols-1 gap-3 ${renderModel === 'dall-e-3' ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
+          <div className={`grid grid-cols-1 gap-3 ${showQualityControl || showGptImage2Controls ? 'sm:grid-cols-2 lg:grid-cols-4' : 'sm:grid-cols-3'}`}>
             <div className="flex flex-col gap-1.5">
               <Label>Prompt model</Label>
               <Select value={promptModel} onValueChange={(v) => setPromptModel(v as ImagePromptModelId)}>
@@ -207,12 +238,70 @@ export default function ImageStudioPage() {
                 </Select>
               </div>
             )}
+            {isGptImage && (
+              <div className="flex flex-col gap-1.5">
+                <Label>GPT Image quality</Label>
+                <Select
+                  value={gptImageQuality}
+                  onValueChange={(v) => setGptImageQuality(v as GptImageQualityId)}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    {GPT_IMAGE_QUALITY_OPTIONS.map((q) => (
+                      <SelectItem key={q.id} value={q.id}>
+                        {q.label}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+            {isGptImage2 && (
+              <>
+                <div className="flex flex-col gap-1.5">
+                  <Label>Resolution</Label>
+                  <Select
+                    value={gptImage2Resolution}
+                    onValueChange={(v) => setGptImage2Resolution(v as GptImage2ResolutionId)}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {GPT_IMAGE_2_RESOLUTION_OPTIONS.map((r) => (
+                        <SelectItem key={r.id} value={r.id}>
+                          {r.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <Label>Thinking mode</Label>
+                  <Select
+                    value={gptImageThinking}
+                    onValueChange={(v) => setGptImageThinking(v as GptImage2ThinkingId)}
+                  >
+                    <SelectTrigger><SelectValue /></SelectTrigger>
+                    <SelectContent>
+                      {GPT_IMAGE_2_THINKING_OPTIONS.map((t) => (
+                        <SelectItem key={t.id} value={t.id}>
+                          {t.label}
+                        </SelectItem>
+                      ))}
+                    </SelectContent>
+                  </Select>
+                </div>
+              </>
+            )}
           </div>
           <p className="text-[11px] text-muted-foreground -mt-1">
             {IMAGE_PROMPT_MODELS.find((m) => m.id === promptModel)?.description}
             {' · '}
             {[...OPENAI_RENDER_MODELS, ...POLLINATIONS_RENDER_MODELS].find((m) => m.id === renderModel)?.description}
-            {isOpenAIRender ? ' · Requires OPENAI_API_KEY' : ' · Pollinations render (free)'}
+            {isOpenAIRender
+              ? hasOpenAI
+                ? ' · Powered by OPENAI_API_KEY'
+                : ' · Requires OPENAI_API_KEY in .env.local'
+              : ' · Pollinations render (free)'}
           </p>
           <BrandThemeReferenceSelect
             brandProfile={data?.brandProfile}

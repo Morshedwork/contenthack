@@ -56,7 +56,7 @@ export const dashboardNavGroups: NavGroup[] = [
     items: [
       { label: 'Market Research', href: '/dashboard/research', icon: Search, description: 'Competitor & market analysis', keywords: ['research', 'market', 'trends'] },
       { label: 'Content Studio', href: '/dashboard/content', icon: FileText, description: 'Generate social posts', keywords: ['content', 'posts', 'copy'] },
-      { label: 'Image Studio', href: '/dashboard/image', icon: ImageIcon, description: 'AI image generation with Kimi', keywords: ['image', 'kimi', 'visual'] },
+      { label: 'Image Studio', href: '/dashboard/image', icon: ImageIcon, description: 'GPT Image & DALL·E generation via OpenAI API', keywords: ['image', 'openai', 'gpt', 'visual'] },
       { label: 'Video Studio', href: '/dashboard/video', icon: Video, description: 'Scripts & PixVerse video generation', keywords: ['video', 'reels', 'pixverse'] },
     ],
   },

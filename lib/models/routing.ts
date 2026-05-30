@@ -1,5 +1,6 @@
 import { demoModelRouting } from '@/lib/demo/data'
 import { OPENAI_MODEL, OPENAI_MODEL_QUALITY } from '@/lib/ai/openai'
+import { OPENAI_IMAGE_MODEL, normalizeOpenAIImageModel } from '@/lib/ai/openai-image'
 import { KIMI_MODEL } from '@/lib/ai/kimi'
 import type { ModelRouting } from '@/types'
 
@@ -37,6 +38,10 @@ const MODEL_ALIAS_TO_ID: Record<string, string> = {
   'dall-e 3': 'dall-e-3',
   'dall-e 2': 'dall-e-2',
   'gpt image 1': 'gpt-image-1',
+  'gpt image 1.5': 'gpt-image-1.5',
+  'gpt image 1 mini': 'gpt-image-1-mini',
+  'gpt image 2': 'gpt-image-2',
+  'gpt image 2.0': 'gpt-image-2',
   'pixverse v4.5': 'v4.5',
   'pixverse v4': 'v4.5',
   'pixverse v5': 'v5',
@@ -104,7 +109,8 @@ export function resolveTaskModel(
 export function resolveMediaModel(taskType: typeof MODEL_TASK.IMAGE_GENERATION | typeof MODEL_TASK.VIDEO_GENERATION, routing?: ModelRouting[]) {
   const config = resolveTaskModel(taskType, routing)
   if (taskType === MODEL_TASK.IMAGE_GENERATION) {
-    return process.env.KIMI_MODEL?.trim() || config.model || KIMI_MODEL
+    const envModel = process.env.OPENAI_IMAGE_MODEL?.trim()
+    return envModel ? normalizeOpenAIImageModel(envModel) : OPENAI_IMAGE_MODEL || config.model || KIMI_MODEL
   }
   return process.env.PIXVERSE_MODEL?.trim() || config.model || 'v4.5'
 }

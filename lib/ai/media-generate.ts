@@ -9,18 +9,25 @@ import {
   isOpenAIRenderModel,
   isPollinationsRenderModel,
   isValidImagePromptModel,
+  isValidImageRenderModel,
   toOpenAIImageModel,
   toPollinationsModel,
   type ImageAspectRatioId,
   type ImagePromptModelId,
   type ImageRenderModelId,
+  type GptImageQualityId,
+  type GptImage2ResolutionId,
+  type GptImage2ThinkingId,
 } from '@/lib/models/media-options'
 import { modelDisplayNameToId } from '@/lib/models/routing'
 import { enhanceImagePrompt, hasKimi, renderImageFromPrompt } from './kimi'
 import {
   enhanceImagePromptWithOpenAI,
   hasOpenAIImage,
+  normalizeOpenAIImageModel,
+  OPENAI_IMAGE_MODEL,
   renderImageWithOpenAI,
+  type DalleQuality,
 } from './openai-image'
 import { generateVideo, hasPixverse, type PixverseModel, type PixverseQuality } from './pixverse'
 
@@ -45,7 +52,12 @@ function resolvePromptModelId(
   const normalized = modelDisplayNameToId(routed)
   if (isValidImagePromptModel(normalized)) return normalized
   if (isValidImagePromptModel(routed)) return routed
-  return 'kimi-k2.5'
+  return hasOpenAIImage() ? 'gpt-4o' : 'kimi-k2.5'
+}
+
+function resolveRenderModelId(explicit?: ImageRenderModelId): ImageRenderModelId {
+  if (explicit && isValidImageRenderModel(explicit)) return explicit
+  return hasOpenAIImage() ? (normalizeOpenAIImageModel(OPENAI_IMAGE_MODEL) as ImageRenderModelId) : 'flux'
 }
 
 async function buildImageBrief(input: {
@@ -91,10 +103,13 @@ export async function generateMarketingImage(input: {
   promptModel?: ImagePromptModelId
   renderModel?: ImageRenderModelId
   aspectRatio?: ImageAspectRatioId
-  openaiQuality?: 'standard' | 'hd'
+  openaiQuality?: DalleQuality
+  gptImageQuality?: GptImageQualityId
+  gptImage2Resolution?: GptImage2ResolutionId
+  gptImageThinking?: GptImage2ThinkingId
   modelRouting?: ModelRouting[]
 }): Promise<GeneratedImage> {
-  const renderModelId = input.renderModel || 'flux'
+  const renderModelId = resolveRenderModelId(input.renderModel)
   const renderProvider = getImageRenderProvider(renderModelId) || 'pollinations'
   const promptModelId = resolvePromptModelId(input.promptModel, input.modelRouting)
   const promptProvider = getImagePromptProvider(promptModelId) || 'kimi'
@@ -128,7 +143,12 @@ export async function generateMarketingImage(input: {
       brief.enhancedPrompt,
       toOpenAIImageModel(renderModelId),
       aspectRatio,
-      { quality: input.openaiQuality },
+      {
+        quality: input.openaiQuality,
+        gptImageQuality: input.gptImageQuality,
+        gptImage2Resolution: input.gptImage2Resolution,
+        gptImageThinking: input.gptImageThinking,
+      },
     )
     provider = 'OpenAI'
   } else if (isPollinationsRenderModel(renderModelId)) {

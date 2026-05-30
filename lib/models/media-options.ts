@@ -25,10 +25,36 @@ export const POLLINATIONS_RENDER_MODELS = [
 ] as const
 
 export const OPENAI_RENDER_MODELS = [
-  { id: 'dall-e-3', label: 'DALL·E 3', description: 'Best OpenAI quality, HD option', provider: 'openai' as const },
-  { id: 'gpt-image-1', label: 'GPT Image 1', description: 'Latest OpenAI image model', provider: 'openai' as const },
+  { id: 'gpt-image-2', label: 'GPT Image 2.0', description: 'Latest flagship — 2K/4K, reasoning mode', provider: 'openai' as const },
+  { id: 'gpt-image-1.5', label: 'GPT Image 1.5', description: 'Best quality — precise edits, brand-safe', provider: 'openai' as const },
+  { id: 'gpt-image-1', label: 'GPT Image 1', description: 'Strong all-round OpenAI image model', provider: 'openai' as const },
+  { id: 'gpt-image-1-mini', label: 'GPT Image 1 Mini', description: 'Fast & cost-efficient via API key', provider: 'openai' as const },
+  { id: 'dall-e-3', label: 'DALL·E 3', description: 'Classic OpenAI — HD option', provider: 'openai' as const },
   { id: 'dall-e-2', label: 'DALL·E 2', description: 'Fast, economical', provider: 'openai' as const },
 ] as const
+
+export const GPT_IMAGE_QUALITY_OPTIONS = [
+  { id: 'low', label: 'Low', description: 'Fast drafts & iterations' },
+  { id: 'medium', label: 'Medium', description: 'Balanced quality & speed' },
+  { id: 'high', label: 'High', description: 'Best detail for final assets' },
+] as const
+
+export const GPT_IMAGE_2_RESOLUTION_OPTIONS = [
+  { id: '1k', label: '1K (1024px)', description: 'Fastest — social posts' },
+  { id: '2k', label: '2K (2048px)', description: 'Default — sharp marketing assets' },
+  { id: '4k', label: '4K (up to 3840px)', description: 'Maximum detail — print & hero images' },
+] as const
+
+export const GPT_IMAGE_2_THINKING_OPTIONS = [
+  { id: 'off', label: 'Off', description: 'Fastest generation' },
+  { id: 'low', label: 'Low', description: 'Light reasoning before render' },
+  { id: 'medium', label: 'Medium', description: 'Balanced prompt planning' },
+  { id: 'high', label: 'High', description: 'Best for complex compositions' },
+] as const
+
+export type GptImageQualityId = (typeof GPT_IMAGE_QUALITY_OPTIONS)[number]['id']
+export type GptImage2ResolutionId = (typeof GPT_IMAGE_2_RESOLUTION_OPTIONS)[number]['id']
+export type GptImage2ThinkingId = (typeof GPT_IMAGE_2_THINKING_OPTIONS)[number]['id']
 
 export const IMAGE_RENDER_MODELS = [...POLLINATIONS_RENDER_MODELS, ...OPENAI_RENDER_MODELS] as const
 
@@ -92,6 +118,28 @@ export function isPollinationsRenderModel(id: string): id is PollinationsRenderM
 
 export function isOpenAIRenderModel(id: string): id is OpenAIRenderModelId {
   return OPENAI_RENDER_MODELS.some((m) => m.id === id)
+}
+
+const GPT_IMAGE_RENDER_IDS = new Set(['gpt-image-1', 'gpt-image-1.5', 'gpt-image-1-mini', 'gpt-image-2'])
+
+export function isGptImageRenderModel(id: string): boolean {
+  return GPT_IMAGE_RENDER_IDS.has(id)
+}
+
+export function isGptImage2RenderModel(id: string): boolean {
+  return id === 'gpt-image-2'
+}
+
+export function isValidGptImageQuality(id: string): id is GptImageQualityId {
+  return GPT_IMAGE_QUALITY_OPTIONS.some((q) => q.id === id)
+}
+
+export function isValidGptImage2Resolution(id: string): id is GptImage2ResolutionId {
+  return GPT_IMAGE_2_RESOLUTION_OPTIONS.some((r) => r.id === id)
+}
+
+export function isValidGptImage2Thinking(id: string): id is GptImage2ThinkingId {
+  return GPT_IMAGE_2_THINKING_OPTIONS.some((t) => t.id === id)
 }
 
 export function toPollinationsModel(id: PollinationsRenderModelId): PollinationsRenderModel {

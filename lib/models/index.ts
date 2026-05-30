@@ -24,11 +24,17 @@ export {
   VIDEO_DURATIONS,
   VIDEO_QUALITIES,
   VIDEO_ASPECT_RATIOS,
+  GPT_IMAGE_QUALITY_OPTIONS,
+  GPT_IMAGE_2_RESOLUTION_OPTIONS,
+  GPT_IMAGE_2_THINKING_OPTIONS,
   getImagePromptProvider,
   getImageRenderProvider,
   type ImagePromptModelId,
   type ImageRenderModelId,
   type ImageAspectRatioId,
+  type GptImageQualityId,
+  type GptImage2ResolutionId,
+  type GptImage2ThinkingId,
   type VideoDurationSec,
 } from './media-options'
 

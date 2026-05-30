@@ -77,7 +77,11 @@ export const demoModels: AIModel[] = [
   { id: 'gpt-4.1', name: 'GPT-4.1', provider: 'OpenAI', bestFor: 'High-quality, long-context', speed: 'medium', costLevel: 'medium', qualityScore: 94, contextSize: '1M', status: 'available', useCases: ['Market research', 'Strategy', 'Outreach writing'] },
   { id: 'gpt-4.1-mini', name: 'GPT-4.1 mini', provider: 'OpenAI', bestFor: 'Balanced speed & quality', speed: 'fast', costLevel: 'low', qualityScore: 89, contextSize: '1M', status: 'available', useCases: ['Video scripts', 'Analytics summary'] },
   { id: 'o4-mini', name: 'o4-mini', provider: 'OpenAI', bestFor: 'Reasoning, safety & scoring', speed: 'medium', costLevel: 'medium', qualityScore: 91, contextSize: '200K', status: 'available', useCases: ['Brand safety', 'Lead scoring'] },
-  { id: 'kimi-k2.5', name: 'Kimi K2.5', provider: 'Moonshot AI', bestFor: 'AI image generation & visual content', speed: 'medium', costLevel: 'medium', qualityScore: 90, contextSize: '256K', status: 'available', useCases: ['Image generation', 'Visual briefs', 'Social creatives'] },
+  { id: 'kimi-k2.5', name: 'Kimi K2.5', provider: 'Moonshot AI', bestFor: 'AI image prompt enhancement', speed: 'medium', costLevel: 'medium', qualityScore: 90, contextSize: '256K', status: 'available', useCases: ['Image prompts', 'Visual briefs', 'Social creatives'] },
+  { id: 'gpt-image-1.5', name: 'GPT Image 1.5', provider: 'OpenAI', bestFor: 'Best OpenAI image generation via API', speed: 'medium', costLevel: 'medium', qualityScore: 96, contextSize: 'N/A', status: 'available', useCases: ['Image generation', 'Brand creatives', 'Marketing visuals'] },
+  { id: 'gpt-image-2', name: 'GPT Image 2.0', provider: 'OpenAI', bestFor: 'Latest flagship — 2K/4K, reasoning mode', speed: 'medium', costLevel: 'high', qualityScore: 98, contextSize: 'N/A', status: 'available', useCases: ['Image generation', 'High-res assets', 'Product shots', 'Complex compositions'] },
+  { id: 'gpt-image-1', name: 'GPT Image 1', provider: 'OpenAI', bestFor: 'Reliable OpenAI image generation', speed: 'medium', costLevel: 'medium', qualityScore: 93, contextSize: 'N/A', status: 'available', useCases: ['Image generation', 'Social creatives'] },
+  { id: 'gpt-image-1-mini', name: 'GPT Image 1 Mini', provider: 'OpenAI', bestFor: 'Cost-efficient bulk image generation', speed: 'fast', costLevel: 'low', qualityScore: 88, contextSize: 'N/A', status: 'available', useCases: ['Image generation', 'Bulk creatives', 'Drafts'] },
   { id: 'pixverse-v4.5', name: 'PixVerse v4.5', provider: 'PixVerse', bestFor: 'Text-to-video generation', speed: 'slow', costLevel: 'medium', qualityScore: 88, contextSize: 'N/A', status: 'available', useCases: ['Text-to-video', 'Short-form reels', 'Marketing clips'] },
   { id: 'pixverse-v6', name: 'PixVerse v6', provider: 'PixVerse', bestFor: 'High-quality AI video', speed: 'slow', costLevel: 'high', qualityScore: 93, contextSize: 'N/A', status: 'available', useCases: ['Text-to-video', '1080p video', 'Cinematic clips'] },
 ]
@@ -90,7 +94,7 @@ export const demoModelRouting: ModelRouting[] = [
   { taskType: 'Lead scoring', assignedModel: 'o4-mini', fallbackModel: 'GPT-4o mini', temperature: 0.2, maxTokens: 4096, costEstimate: '$0.02/lead', qualityPriority: 'speed' },
   { taskType: 'Outreach writing', assignedModel: 'GPT-4o', fallbackModel: 'GPT-4.1', temperature: 0.6, maxTokens: 1536, costEstimate: '$0.04/message', qualityPriority: 'quality' },
   { taskType: 'Analytics summary', assignedModel: 'GPT-4o mini', fallbackModel: 'GPT-4.1 mini', temperature: 0.3, maxTokens: 2048, costEstimate: '$0.02/report', qualityPriority: 'speed' },
-  { taskType: 'Image generation', assignedModel: 'Kimi K2.5', fallbackModel: 'GPT-4o', temperature: 0.7, maxTokens: 1024, costEstimate: '$0.03/image', qualityPriority: 'quality' },
+  { taskType: 'Image generation', assignedModel: 'GPT Image 1.5', fallbackModel: 'GPT Image 1', temperature: 0.7, maxTokens: 1024, costEstimate: '$0.04/image', qualityPriority: 'quality' },
   { taskType: 'Video generation', assignedModel: 'PixVerse v4.5', fallbackModel: 'PixVerse v6', temperature: 0.8, maxTokens: 512, costEstimate: '$0.15/video', qualityPriority: 'quality' },
 ]
 
