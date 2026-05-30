@@ -14,6 +14,9 @@ import { useEffect } from 'react'
 import { Badge } from '@/components/ui/badge'
 import { FileText, Sparkles, Workflow } from 'lucide-react'
 import { toast } from 'sonner'
+import { DemoCampaignPicker } from '@/components/demo/demo-campaign-picker'
+import { INVESTOR_PITCH_CAMPAIGN_ID } from '@/lib/demo/investor-pitch'
+import type { DemoPresetId } from '@/lib/demo/presets'
 
 const workflowTasks = [
   'Research task', 'Topic generation task', 'Content generation task', 'Video script task',
@@ -35,6 +38,15 @@ export default function CampaignBuilderPage() {
   if (!campaign) {
     return <div className="p-8 text-sm text-muted-foreground">Loading campaign...</div>
   }
+
+  const activePreset: DemoPresetId | null =
+    campaign.id === INVESTOR_PITCH_CAMPAIGN_ID
+      ? 'investor-pitch'
+      : campaign.id === 'camp-001'
+        ? 'default'
+        : !campaign.companyName
+          ? 'empty'
+          : null
 
   const handleSaveCampaign = async (updated: Campaign) => {
     const res = await fetch('/api/campaigns/update', {
@@ -80,6 +92,14 @@ export default function CampaignBuilderPage() {
           View and edit full campaign details, then generate your AI workflow
         </p>
       </div>
+
+      <section className="mb-8">
+        <h2 className="text-sm font-medium mb-1">Demo campaigns</h2>
+        <p className="text-sm text-muted-foreground mb-4">
+          Load a pre-built workspace for investor pitches or client demos — full pipeline data included.
+        </p>
+        <DemoCampaignPicker activePreset={activePreset} onLoaded={refresh} />
+      </section>
 
       <Tabs defaultValue="details">
         <TabsList className="mb-6">

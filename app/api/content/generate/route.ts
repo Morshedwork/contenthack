@@ -1,6 +1,7 @@
 import { apiFromError, apiSuccess } from '@/lib/api-utils'
 import { withOpenAI } from '@/lib/ai/openai'
 import { generateContentDrafts } from '@/lib/ai/generate'
+import { MODEL_TASK, resolveTaskModel } from '@/lib/models/routing'
 import { getWorkspace, patchWorkspace } from '@/lib/workspace/store'
 import type { Platform } from '@/types'
 
@@ -31,6 +32,7 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}))
     const ws = await getWorkspace()
     const platforms = resolvePlatforms(body.platforms, ws.campaign.platforms)
+    const modelConfig = resolveTaskModel(MODEL_TASK.CONTENT_GENERATION, ws.modelRouting)
 
     const { result: drafts, live } = await withOpenAI(() =>
       generateContentDrafts({
@@ -40,6 +42,7 @@ export async function POST(request: Request) {
         campaignId: body.campaignId || ws.campaign.id,
         customPromptDetails: body.customPromptDetails,
         brandProfile: ws.brandProfile,
+        modelConfig,
       }),
     )
 

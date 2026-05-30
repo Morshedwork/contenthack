@@ -5,10 +5,14 @@ import {
   getWorkspace,
   patchWorkspace,
   resetWorkspace,
+  loadDemoPreset,
   computeDynamicROI,
   updateContentDraftStatus,
 } from '@/lib/workspace/store'
+import type { DemoPresetId } from '@/lib/demo/presets'
 import type { BrandProfile, Campaign, ContentStatus, SafetySettings } from '@/types'
+
+const PRESET_IDS = new Set<DemoPresetId>(['default', 'investor-pitch', 'empty'])
 
 export async function GET() {
   try {
@@ -30,6 +34,17 @@ export async function PATCH(request: Request) {
 
     if (body.action === 'reset') {
       await resetWorkspace()
+      const ws = await getWorkspace()
+      return apiSuccess({
+        ...ws,
+        roi: computeDynamicROI(ws),
+        approvalItems: buildApprovalItems(ws),
+        overviewKPIs: buildOverviewKPIs(ws),
+      })
+    }
+
+    if (body.action === 'loadPreset' && typeof body.preset === 'string' && PRESET_IDS.has(body.preset as DemoPresetId)) {
+      await loadDemoPreset(body.preset as DemoPresetId)
       const ws = await getWorkspace()
       return apiSuccess({
         ...ws,

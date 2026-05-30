@@ -49,7 +49,7 @@ interface GenerateOptions {
  * Generate a JSON object from OpenAI using JSON mode and parse it into type T.
  * The caller is responsible for instructing the model on the exact JSON shape.
  */
-export async function generateJSON<T>(opts: GenerateOptions): Promise<T> {
+async function createJSONCompletion<T>(opts: GenerateOptions): Promise<T> {
   const openai = getOpenAI()
   const completion = await openai.chat.completions.create({
     model: opts.model || OPENAI_MODEL,
@@ -70,8 +70,19 @@ export async function generateJSON<T>(opts: GenerateOptions): Promise<T> {
   }
 }
 
-/** Generate a plain text completion from OpenAI. */
-export async function generateText(opts: GenerateOptions): Promise<string> {
+export async function generateJSON<T>(opts: GenerateOptions & { fallbackModel?: string }): Promise<T> {
+  try {
+    return await createJSONCompletion<T>(opts)
+  } catch (err) {
+    const primary = opts.model || OPENAI_MODEL
+    if (opts.fallbackModel && opts.fallbackModel !== primary) {
+      return createJSONCompletion<T>({ ...opts, model: opts.fallbackModel })
+    }
+    throw err
+  }
+}
+
+async function createTextCompletion(opts: GenerateOptions): Promise<string> {
   const openai = getOpenAI()
   const completion = await openai.chat.completions.create({
     model: opts.model || OPENAI_MODEL,
@@ -83,6 +94,19 @@ export async function generateText(opts: GenerateOptions): Promise<string> {
     ],
   })
   return completion.choices[0]?.message?.content?.trim() || ''
+}
+
+/** Generate a plain text completion from OpenAI. */
+export async function generateText(opts: GenerateOptions & { fallbackModel?: string }): Promise<string> {
+  try {
+    return await createTextCompletion(opts)
+  } catch (err) {
+    const primary = opts.model || OPENAI_MODEL
+    if (opts.fallbackModel && opts.fallbackModel !== primary) {
+      return createTextCompletion({ ...opts, model: opts.fallbackModel })
+    }
+    throw err
+  }
 }
 
 /** Run an OpenAI-backed generator. Requires OPENAI_API_KEY — no demo/mock fallback. */

@@ -8,8 +8,9 @@ import type {
   BrandProfile,
 } from '@/types'
 import { DEMO_COMPANY, demoBrandProfile } from '@/lib/demo/data'
-import { generateJSON, generateText, OPENAI_MODEL_QUALITY } from './openai'
+import { generateJSON, generateText } from './openai'
 import { appendCustomPrompt, normalizeCustomPromptDetails, platformsFromPromptHint } from './prompt-utils'
+import { MODEL_TASK, resolveTaskModel, type TaskModelConfig } from '@/lib/models/routing'
 
 function buildBrandContext(profile?: BrandProfile, region?: string): string {
   const p = profile ?? demoBrandProfile
@@ -64,6 +65,10 @@ function readDraftField(draft: Record<string, unknown>, ...keys: string[]): stri
   return ''
 }
 
+function taskConfig(input: { modelConfig?: TaskModelConfig }, taskType: TaskModelConfig['taskType']): TaskModelConfig {
+  return input.modelConfig ?? resolveTaskModel(taskType)
+}
+
 // ─── Market research ───────────────────────────────────────────────────────
 export async function generateResearch(input: {
   industry?: string
@@ -72,7 +77,9 @@ export async function generateResearch(input: {
   offer?: string
   customPromptDetails?: string
   brandProfile?: BrandProfile
+  modelConfig?: TaskModelConfig
 }): Promise<MarketResearch> {
+  const mc = taskConfig(input, MODEL_TASK.MARKET_RESEARCH)
   const industry = input.industry || DEMO_COMPANY.industry
   const targetCustomer = input.targetCustomer || DEMO_COMPANY.targetCustomers
   const region = input.region || DEMO_COMPANY.region
@@ -80,9 +87,10 @@ export async function generateResearch(input: {
   const brandContext = buildBrandContext(input.brandProfile, region)
 
   const data = await generateJSON<Partial<MarketResearch>>({
-    model: OPENAI_MODEL_QUALITY,
-    temperature: 0.4,
-    maxTokens: 3000,
+    model: mc.model,
+    fallbackModel: mc.fallbackModel,
+    temperature: mc.temperature,
+    maxTokens: mc.maxTokens,
     system: `You are a senior B2B market research analyst. Produce sharp, data-aware insights for a marketing team. Always respond with a single valid JSON object and nothing else.`,
     user: appendCustomPrompt(`${brandContext}
 
@@ -128,11 +136,16 @@ export async function generateTopics(input: {
   count?: number
   customPromptDetails?: string
   brandProfile?: BrandProfile
+  modelConfig?: TaskModelConfig
 }): Promise<string[]> {
+  const mc = taskConfig(input, MODEL_TASK.CONTENT_GENERATION)
   const count = input.count ?? 12
   const brandContext = buildBrandContext(input.brandProfile)
   const data = await generateJSON<{ topics?: string[] }>({
-    temperature: 0.8,
+    model: mc.model,
+    fallbackModel: mc.fallbackModel,
+    temperature: mc.temperature,
+    maxTokens: mc.maxTokens,
     system: `You are a B2B content strategist. Respond only with a valid JSON object.`,
     user: appendCustomPrompt(`${brandContext}
 
@@ -152,7 +165,9 @@ export async function generateContentDrafts(input: {
   campaignId?: string
   customPromptDetails?: string
   brandProfile?: BrandProfile
+  modelConfig?: TaskModelConfig
 }): Promise<ContentDraft[]> {
+  const mc = taskConfig(input, MODEL_TASK.CONTENT_GENERATION)
   const defaultPlatforms: Platform[] =
     input.platforms ?? (input.platform ? [input.platform] : ['linkedin', 'instagram', 'facebook', 'x'])
   const platforms = input.platform
@@ -168,8 +183,10 @@ export async function generateContentDrafts(input: {
     DEMO_COMPANY.goal
 
   const data = await generateJSON<{ drafts?: Partial<ContentDraft>[] }>({
-    temperature: 0.75,
-    maxTokens: 3000,
+    model: mc.model,
+    fallbackModel: mc.fallbackModel,
+    temperature: mc.temperature,
+    maxTokens: mc.maxTokens,
     system: `You are an expert social media copywriter. Write platform-native, high-converting posts that respect the brand's tone and content rules. Respond only with a valid JSON object.`,
     user: appendCustomPrompt(`${brandContext}
 
@@ -225,13 +242,17 @@ export async function generateVideoScripts(input: {
   count?: number
   customPromptDetails?: string
   brandProfile?: BrandProfile
+  modelConfig?: TaskModelConfig
 }): Promise<VideoScript[]> {
+  const mc = taskConfig(input, MODEL_TASK.VIDEO_SCRIPTS)
   const count = input.count ?? 3
   const brandContext = buildBrandContext(input.brandProfile)
   const profile = input.brandProfile ?? demoBrandProfile
   const data = await generateJSON<{ scripts?: Partial<VideoScript>[] }>({
-    temperature: 0.8,
-    maxTokens: 3500,
+    model: mc.model,
+    fallbackModel: mc.fallbackModel,
+    temperature: mc.temperature,
+    maxTokens: mc.maxTokens,
     system: `You are a short-form video scriptwriter (Reels, Shorts, TikTok). Respond only with a valid JSON object.`,
     user: appendCustomPrompt(`${brandContext}
 
@@ -275,13 +296,17 @@ export async function generateLeads(input: {
   criteria?: string
   customPromptDetails?: string
   brandProfile?: BrandProfile
+  modelConfig?: TaskModelConfig
 }): Promise<Lead[]> {
+  const mc = taskConfig(input, MODEL_TASK.LEAD_SCORING)
   const count = input.count ?? 12
   const brandContext = buildBrandContext(input.brandProfile)
   const profile = input.brandProfile ?? demoBrandProfile
   const data = await generateJSON<{ leads?: Partial<Lead>[] }>({
-    temperature: 0.7,
-    maxTokens: 3500,
+    model: mc.model,
+    fallbackModel: mc.fallbackModel,
+    temperature: mc.temperature,
+    maxTokens: mc.maxTokens,
     system: `You are a B2B lead generation researcher. Generate realistic, plausible prospect profiles (these are illustrative examples, not real contact data). Respond only with a valid JSON object.`,
     user: appendCustomPrompt(`${brandContext}
 
@@ -331,11 +356,15 @@ export async function generateOutreach(input: {
   matchReason?: string
   customPromptDetails?: string
   brandProfile?: BrandProfile
+  modelConfig?: TaskModelConfig
 }): Promise<OutreachMessage> {
+  const mc = taskConfig(input, MODEL_TASK.OUTREACH_WRITING)
   const brandContext = buildBrandContext(input.brandProfile)
   const data = await generateJSON<Partial<OutreachMessage>>({
-    temperature: 0.7,
-    maxTokens: 1500,
+    model: mc.model,
+    fallbackModel: mc.fallbackModel,
+    temperature: mc.temperature,
+    maxTokens: mc.maxTokens,
     system: `You are an expert B2B outreach copywriter. Write warm, personalized, non-spammy messages. Respond only with a valid JSON object.`,
     user: appendCustomPrompt(`${brandContext}
 
@@ -376,13 +405,19 @@ export interface SafetyResult {
   message: string
 }
 
-export async function checkBrandSafety(input: { content?: string; brandProfile?: BrandProfile }): Promise<SafetyResult> {
+export async function checkBrandSafety(input: {
+  content?: string
+  brandProfile?: BrandProfile
+  modelConfig?: TaskModelConfig
+}): Promise<SafetyResult> {
+  const mc = taskConfig(input, MODEL_TASK.BRAND_SAFETY)
   const content = input.content || ''
   const brandContext = buildBrandContext(input.brandProfile)
   const data = await generateJSON<Partial<SafetyResult>>({
-    model: OPENAI_MODEL_QUALITY,
-    temperature: 0.1,
-    maxTokens: 800,
+    model: mc.model,
+    fallbackModel: mc.fallbackModel,
+    temperature: mc.temperature,
+    maxTokens: mc.maxTokens,
     system: `You are a brand safety and compliance reviewer. Detect risky claims, unverifiable guarantees, spammy phrasing, and off-brand language. Respond only with a valid JSON object.`,
     user: `${brandContext}
 
@@ -414,11 +449,15 @@ export async function generateOutput(
   input: string,
   customPromptDetails?: string,
   brandProfile?: BrandProfile,
+  modelConfig?: TaskModelConfig,
 ): Promise<string> {
+  const mc = modelConfig ?? resolveTaskModel(MODEL_TASK.ANALYTICS_SUMMARY)
   const brandContext = buildBrandContext(brandProfile)
   return generateText({
-    temperature: 0.7,
-    maxTokens: 1200,
+    model: mc.model,
+    fallbackModel: mc.fallbackModel,
+    temperature: mc.temperature,
+    maxTokens: mc.maxTokens,
     system: `You are an AI marketing agent specialized in "${taskType}". ${brandContext}`,
     user: appendCustomPrompt(
       input || `Perform the "${taskType}" task and summarize the result.`,

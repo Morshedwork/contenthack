@@ -33,10 +33,12 @@ export async function enhanceImagePrompt(input: {
   prompt: string
   brandContext?: string
   customPromptDetails?: string
+  model?: string
 }): Promise<KimiImagePrompt> {
   const kimi = getKimi()
+  const model = input.model || KIMI_MODEL
   const completion = await kimi.chat.completions.create({
-    model: KIMI_MODEL,
+    model,
     temperature: 1,
     max_tokens: 1024,
     response_format: { type: 'json_object' },
@@ -79,14 +81,40 @@ const ASPECT_DIMENSIONS: Record<KimiImagePrompt['aspectRatio'], { width: number;
   '4:3': { width: 1152, height: 896 },
 }
 
+export type PollinationsRenderModel =
+  | 'flux'
+  | 'flux-2-dev'
+  | 'klein'
+  | 'klein-large'
+  | 'zimage'
+  | 'seedream'
+  | 'gptimage'
+
 /** Render an image from a Kimi-enhanced prompt using Pollinations (no extra API key). */
 export async function renderImageFromPrompt(
   prompt: string,
   aspectRatio: KimiImagePrompt['aspectRatio'] = '1:1',
+  options?: {
+    renderModel?: PollinationsRenderModel
+    negativePrompt?: string
+    quality?: 'low' | 'medium' | 'high' | 'hd'
+  },
 ): Promise<string> {
   const { width, height } = ASPECT_DIMENSIONS[aspectRatio]
   const encoded = encodeURIComponent(prompt.slice(0, 500))
-  const url = `https://image.pollinations.ai/prompt/${encoded}?width=${width}&height=${height}&nologo=true&seed=${Date.now()}`
+  const model = options?.renderModel || 'flux'
+  const params = new URLSearchParams({
+    width: String(width),
+    height: String(height),
+    model,
+    nologo: 'true',
+    seed: String(Date.now()),
+    quality: options?.quality || 'medium',
+  })
+  if (options?.negativePrompt) {
+    params.set('negative', options.negativePrompt.slice(0, 200))
+  }
+  const url = `https://image.pollinations.ai/prompt/${encoded}?${params.toString()}`
 
   const res = await fetch(url, { signal: AbortSignal.timeout(90000) })
   if (!res.ok) throw new Error(`Image render failed (${res.status})`)

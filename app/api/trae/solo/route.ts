@@ -2,6 +2,7 @@ import { apiError, apiFromError, apiSuccess } from '@/lib/api-utils'
 import { generateContentDrafts } from '@/lib/ai/generate'
 import { withOpenAI } from '@/lib/ai/openai'
 import { runTraeSoloTopicGeneration, TRAE_SOLO_CAPABILITIES, validateTopicBrief } from '@/lib/trae/solo'
+import { MODEL_TASK, resolveTaskModel } from '@/lib/models/routing'
 import { getWorkspace, patchWorkspace } from '@/lib/workspace/store'
 import type { GeneratedTopic, Platform } from '@/types'
 
@@ -31,7 +32,8 @@ export async function POST(request: Request) {
       case 'generate_topics': {
         if (!body.brief) return apiError('brief is required for generate_topics', 400)
         validateTopicBrief(body.brief)
-        const result = await runTraeSoloTopicGeneration(body.brief)
+        const modelConfig = resolveTaskModel(MODEL_TASK.CONTENT_GENERATION, ws.modelRouting)
+        const result = await runTraeSoloTopicGeneration({ ...body.brief, modelConfig })
         await patchWorkspace({
           topics: result.topics,
           campaign: {
@@ -57,12 +59,14 @@ export async function POST(request: Request) {
             : 'linkedin'
         if (!topic?.title) return apiError('topic with title is required for generate_content', 400)
 
+        const contentModelConfig = resolveTaskModel(MODEL_TASK.CONTENT_GENERATION, ws.modelRouting)
         const { result: drafts, live } = await withOpenAI(() =>
           generateContentDrafts({
             platform,
             topic: topic.title,
             campaignId: ws.campaign.id,
             brandProfile: ws.brandProfile,
+            modelConfig: contentModelConfig,
           }),
         )
 

@@ -6,8 +6,9 @@ import type {
   TopicBrief,
   TraeSoloTopicResult,
 } from '@/types'
-import { generateJSON, OPENAI_MODEL, withOpenAI } from '@/lib/ai/openai'
+import { generateJSON, withOpenAI } from '@/lib/ai/openai'
 import { appendCustomPrompt, normalizeCustomPromptDetails } from '@/lib/ai/prompt-utils'
+import { MODEL_TASK, resolveTaskModel, type TaskModelConfig } from '@/lib/models/routing'
 
 const PILLAR_TEMPLATES = [
   { name: 'Problem Awareness', description: 'Pain points and challenges your audience faces' },
@@ -181,7 +182,8 @@ async function generateTopicsDemo(brief: TopicBrief): Promise<GeneratedTopic[]> 
     .slice(0, brief.topicCount)
 }
 
-async function generateTopicsOpenAI(brief: TopicBrief): Promise<GeneratedTopic[]> {
+async function generateTopicsOpenAI(brief: TopicBrief, modelConfig?: TaskModelConfig): Promise<GeneratedTopic[]> {
+  const mc = modelConfig ?? resolveTaskModel(MODEL_TASK.CONTENT_GENERATION)
   const pillarNames = PILLAR_TEMPLATES.map((p) => p.name)
   const platforms = brief.platforms.join(', ')
   const pointBlock = brief.keyPoints.length ? `Key points:\n- ${brief.keyPoints.join('\n- ')}` : ''
@@ -190,9 +192,10 @@ async function generateTopicsOpenAI(brief: TopicBrief): Promise<GeneratedTopic[]
     : ''
 
   const data = await generateJSON<{ topics?: unknown[] }>({
-    model: OPENAI_MODEL,
-    temperature: 0.75,
-    maxTokens: 2600,
+    model: mc.model,
+    fallbackModel: mc.fallbackModel,
+    temperature: mc.temperature,
+    maxTokens: mc.maxTokens,
     system:
       'You are an autonomous content strategy agent. Respond with a single valid JSON object only. No markdown. No extra keys.',
     user: appendCustomPrompt(`Generate ${brief.topicCount} high-intent content topics for this brief.
@@ -262,8 +265,11 @@ Return JSON with exactly this shape:
   return normalized.slice(0, brief.topicCount)
 }
 
-export async function runTraeSoloTopicGeneration(briefInput: Partial<TopicBrief>): Promise<TraeSoloTopicResult> {
-  const brief = validateTopicBrief(briefInput)
+export async function runTraeSoloTopicGeneration(
+  briefInput: Partial<TopicBrief> & { modelConfig?: TaskModelConfig },
+): Promise<TraeSoloTopicResult> {
+  const { modelConfig, ...rest } = briefInput
+  const brief = validateTopicBrief(rest)
   const executionSteps = [
     'TRAE Solo: Parsing structured brief (title, goal, points, base content)',
     'TRAE Solo: Mapping key points to content pillars',
@@ -271,11 +277,12 @@ export async function runTraeSoloTopicGeneration(briefInput: Partial<TopicBrief>
     'TRAE Solo: Generating hooks, angles, and format recommendations',
   ]
 
-  const { result: topics } = await withOpenAI(() => generateTopicsOpenAI(brief))
+  const { result: topics } = await withOpenAI(() => generateTopicsOpenAI(brief, modelConfig))
   if (!topics.length) {
     throw new Error('OpenAI returned no topics — try adding more key points or base content')
   }
   const contentPillars = buildContentPillars(topics)
+  const mc = modelConfig ?? resolveTaskModel(MODEL_TASK.CONTENT_GENERATION)
 
   return {
     agent: 'trae-solo',
@@ -284,8 +291,8 @@ export async function runTraeSoloTopicGeneration(briefInput: Partial<TopicBrief>
     topics,
     contentPillars,
     summary: `Generated ${topics.length} topics from ${brief.keyPoints.length} key points${brief.baseContent ? ' + base content' : ''}. Highest intent: "${topics[0]?.title.slice(0, 50)}..."`,
-    executionSteps: [...executionSteps, `TRAE Solo: OpenAI ${OPENAI_MODEL}`],
-    modelUsed: `OpenAI (${OPENAI_MODEL}) via TRAE Solo`,
+    executionSteps: [...executionSteps, `TRAE Solo: ${mc.assignedModel}`],
+    modelUsed: `${mc.assignedModel} via TRAE Solo`,
   }
 }
 

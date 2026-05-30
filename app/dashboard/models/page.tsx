@@ -42,7 +42,9 @@ export default function ModelsPage() {
     <>
       <div className="mb-8">
         <h1 className="text-2xl md:text-3xl font-display tracking-tight mb-1">Model Hub</h1>
-        <p className="text-muted-foreground text-sm">AI model management and task routing configuration</p>
+        <p className="text-muted-foreground text-sm">
+          AI model management and task routing — assignments drive every agent and generation task
+        </p>
       </div>
 
       <div className="grid grid-cols-2 md:grid-cols-5 gap-4 mb-8">

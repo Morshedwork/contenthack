@@ -68,3 +68,7 @@ export async function patchWorkspaceClient(body: Record<string, unknown>): Promi
     }),
   )
 }
+
+export async function loadDemoPresetClient(preset: 'default' | 'investor-pitch' | 'empty'): Promise<WorkspacePayload> {
+  return patchWorkspaceClient({ action: 'loadPreset', preset })
+}

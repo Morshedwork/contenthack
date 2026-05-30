@@ -3,6 +3,35 @@ import type { AIModel, ModelRouting } from '@/types'
 import { generateOutput } from '@/lib/ai/generate'
 import { requireOpenAI } from '@/lib/ai/openai'
 
+export {
+  MODEL_TASK,
+  resolveTaskModel,
+  resolveMediaModel,
+  assignedModelLabel,
+  modelDisplayNameToId,
+  AGENT_TASK_MAP,
+  type TaskModelConfig,
+  type ModelTaskType,
+} from './routing'
+
+export {
+  IMAGE_PROMPT_MODELS,
+  IMAGE_RENDER_MODELS,
+  POLLINATIONS_RENDER_MODELS,
+  OPENAI_RENDER_MODELS,
+  IMAGE_ASPECT_RATIOS,
+  VIDEO_MODELS,
+  VIDEO_DURATIONS,
+  VIDEO_QUALITIES,
+  VIDEO_ASPECT_RATIOS,
+  getImagePromptProvider,
+  getImageRenderProvider,
+  type ImagePromptModelId,
+  type ImageRenderModelId,
+  type ImageAspectRatioId,
+  type VideoDurationSec,
+} from './media-options'
+
 export function getModels(): AIModel[] {
   return demoModels.filter((m) => m.id !== 'mock')
 }

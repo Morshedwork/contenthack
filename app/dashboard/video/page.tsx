@@ -13,6 +13,14 @@ import { CustomPromptPanel } from '@/components/shared/custom-prompt-panel'
 import { BrandThemeReferenceSelect } from '@/components/brand/brand-theme-reference-select'
 import { useWorkspace } from '@/hooks/use-workspace'
 import type { GeneratedVideo, VideoScript } from '@/types'
+import type { PixverseModel, PixverseQuality } from '@/lib/ai/pixverse'
+import {
+  VIDEO_ASPECT_RATIOS,
+  VIDEO_DURATIONS,
+  VIDEO_MODELS,
+  VIDEO_QUALITIES,
+  type VideoDurationSec,
+} from '@/lib/models/media-options'
 import { Archive, Copy, Film, Loader2, Send, Sparkles, Clock, Play } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -22,8 +30,10 @@ export default function VideoStudioPage() {
   const [videos, setVideos] = useState<GeneratedVideo[]>([])
   const [topic, setTopic] = useState('')
   const [videoPrompt, setVideoPrompt] = useState('')
-  const [videoModel, setVideoModel] = useState<'v4.5' | 'v6'>('v4.5')
-  const [aspectRatio, setAspectRatio] = useState<'16:9' | '9:16'>('16:9')
+  const [videoModel, setVideoModel] = useState<PixverseModel>('v4.5')
+  const [videoDuration, setVideoDuration] = useState<VideoDurationSec>(5)
+  const [videoQuality, setVideoQuality] = useState<PixverseQuality>('540p')
+  const [aspectRatio, setAspectRatio] = useState<(typeof VIDEO_ASPECT_RATIOS)[number]['id']>('16:9')
   const [customPromptDetails, setCustomPromptDetails] = useState('')
   const [brandThemeId, setBrandThemeId] = useState('')
   const [loading, setLoading] = useState(false)
@@ -78,7 +88,8 @@ export default function VideoStudioPage() {
           prompt,
           model: videoModel,
           aspectRatio,
-          duration: 5,
+          duration: videoDuration,
+          quality: videoQuality,
           customPromptDetails: customPromptDetails.trim() || undefined,
           brandThemeId: brandThemeId && brandThemeId !== 'none' ? brandThemeId : undefined,
         }),
@@ -118,7 +129,7 @@ export default function VideoStudioPage() {
           </Button>
           <Badge variant="secondary" className="w-fit gap-1.5 py-1.5 px-3">
             <Film className="size-3.5" />
-            PixVerse {videoModel}
+            PixVerse {videoModel} · {videoDuration}s · {videoQuality}
           </Badge>
         </div>
       </div>
@@ -151,28 +162,75 @@ export default function VideoStudioPage() {
                     placeholder={scripts[0]?.aiVideoPrompt?.slice(0, 80) || 'Describe the video scene...'}
                   />
                 </div>
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                   <div className="flex flex-col gap-1.5">
                     <Label>Model</Label>
-                    <Select value={videoModel} onValueChange={(v) => setVideoModel(v as 'v4.5' | 'v6')}>
+                    <Select value={videoModel} onValueChange={(v) => setVideoModel(v as PixverseModel)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="v4.5">PixVerse v4.5</SelectItem>
-                        <SelectItem value="v6">PixVerse v6</SelectItem>
+                        {VIDEO_MODELS.map((m) => (
+                          <SelectItem key={m.id} value={m.id}>
+                            {m.label}
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label>Duration</Label>
+                    <Select
+                      value={String(videoDuration)}
+                      onValueChange={(v) => setVideoDuration(Number(v) as VideoDurationSec)}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {VIDEO_DURATIONS.map((sec) => (
+                          <SelectItem key={sec} value={String(sec)}>
+                            {sec} seconds
+                          </SelectItem>
+                        ))}
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="flex flex-col gap-1.5">
+                    <Label>Quality</Label>
+                    <Select
+                      value={videoQuality}
+                      onValueChange={(v) => setVideoQuality(v as PixverseQuality)}
+                    >
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        {VIDEO_QUALITIES.map((q) => (
+                          <SelectItem key={q.id} value={q.id}>
+                            {q.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
                   <div className="flex flex-col gap-1.5">
                     <Label>Aspect ratio</Label>
-                    <Select value={aspectRatio} onValueChange={(v) => setAspectRatio(v as '16:9' | '9:16')}>
+                    <Select
+                      value={aspectRatio}
+                      onValueChange={(v) =>
+                        setAspectRatio(v as (typeof VIDEO_ASPECT_RATIOS)[number]['id'])
+                      }
+                    >
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="16:9">16:9 Landscape</SelectItem>
-                        <SelectItem value="9:16">9:16 Reels</SelectItem>
+                        {VIDEO_ASPECT_RATIOS.map((ar) => (
+                          <SelectItem key={ar.id} value={ar.id}>
+                            {ar.label}
+                          </SelectItem>
+                        ))}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
+                <p className="text-[11px] text-muted-foreground -mt-1">
+                  {VIDEO_MODELS.find((m) => m.id === videoModel)?.description}
+                  {videoModel === 'v6' ? ' · v6 supports up to 15s at 1080p.' : ''}
+                </p>
               </div>
               <BrandThemeReferenceSelect
                 brandProfile={data?.brandProfile}

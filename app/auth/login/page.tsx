@@ -1,5 +1,6 @@
 'use client'
 
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -7,6 +8,22 @@ import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 import { useState } from 'react'
 import { ArrowLeft, Loader2 } from 'lucide-react'
+
+async function signInWithAutoConfirm(email: string, password: string) {
+  const supabase = createClient()
+  let result = await supabase.auth.signInWithPassword({ email, password })
+
+  if (result.error?.message === 'Email not confirmed') {
+    await fetch('/api/auth/confirm', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email }),
+    })
+    result = await supabase.auth.signInWithPassword({ email, password })
+  }
+
+  return result
+}
 
 export default function LoginPage() {
   const [email, setEmail] = useState('')
@@ -21,15 +38,15 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      const res = await fetch('/api/auth/login', {
+      await fetch('/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, password }),
+        body: JSON.stringify({ email }),
       })
-      const json = await res.json()
-      if (!res.ok || !json.success) {
-        throw new Error(json.error ?? 'Sign in failed')
-      }
+
+      const { error: signInError } = await signInWithAutoConfirm(email, password)
+      if (signInError) throw signInError
+
       router.push('/dashboard')
       router.refresh()
     } catch (error: unknown) {
@@ -41,19 +58,17 @@ export default function LoginPage() {
 
   return (
     <div className="relative min-h-screen flex flex-col bg-background">
-      {/* Background effects */}
       <div className="absolute inset-0 overflow-hidden pointer-events-none">
         <div className="absolute top-0 left-1/4 w-96 h-96 bg-foreground/5 rounded-full blur-3xl" />
         <div className="absolute bottom-0 right-1/4 w-96 h-96 bg-foreground/5 rounded-full blur-3xl" />
       </div>
 
-      {/* Header */}
       <header className="relative z-10 flex items-center justify-between px-6 lg:px-12 py-6">
         <Link href="/" className="flex items-center gap-2 group">
           <span className="text-xl font-display tracking-tight text-foreground">ContentOps AI</span>
         </Link>
-        <Link 
-          href="/" 
+        <Link
+          href="/"
           className="flex items-center gap-2 text-sm text-muted-foreground hover:text-foreground transition-colors"
         >
           <ArrowLeft className="w-4 h-4" />
@@ -61,7 +76,6 @@ export default function LoginPage() {
         </Link>
       </header>
 
-      {/* Main content */}
       <main className="relative z-10 flex-1 flex items-center justify-center px-6 py-12">
         <div className="w-full max-w-md">
           <div className="text-center mb-10">
@@ -89,7 +103,7 @@ export default function LoginPage() {
                   className="bg-input border-border text-foreground placeholder:text-muted-foreground focus:ring-1 focus:ring-foreground/20"
                 />
               </div>
-              
+
               <div className="space-y-2">
                 <Label htmlFor="password" className="text-sm text-foreground">
                   Password
@@ -110,8 +124,8 @@ export default function LoginPage() {
                 </div>
               )}
 
-              <Button 
-                type="submit" 
+              <Button
+                type="submit"
                 className="w-full bg-foreground text-background hover:bg-foreground/90 rounded-full h-11"
                 disabled={isLoading}
               >
@@ -141,7 +155,6 @@ export default function LoginPage() {
         </div>
       </main>
 
-      {/* Footer */}
       <footer className="relative z-10 px-6 lg:px-12 py-6">
         <p className="text-center text-sm text-muted-foreground">
           By continuing, you agree to ContentOps AI&apos;s Terms of Service and Privacy Policy.

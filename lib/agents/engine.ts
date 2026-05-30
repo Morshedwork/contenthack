@@ -5,6 +5,7 @@ import { generateResearch, generateContentDrafts, generateVideoScripts, generate
 import { extractBrandThemeFromUrl, isValidCompanyUrl } from '@/lib/ai/brand-theme'
 import { normalizeCustomPromptDetails, platformsFromPromptHint } from '@/lib/ai/prompt-utils'
 import { hasOpenAI, withOpenAI } from '@/lib/ai/openai'
+import { assignedModelLabel, resolveTaskModel, AGENT_TASK_MAP } from '@/lib/models/routing'
 import { runTraeSoloTopicGeneration } from '@/lib/trae/solo'
 import { publishToPlatform } from '@/lib/publishers/publish'
 import {
@@ -20,8 +21,13 @@ import { demoAgents } from '@/lib/demo/data'
 
 const taskId = (agentId: string) => `task-${agentId}-${Date.now().toString(36)}`
 
-async function setAgentRunning(ctx: WorkspaceContext, agentId: string, taskName: string): Promise<void> {
-  await updateAgent(agentId, { status: 'running', progress: 10, currentTask: taskName }, ctx)
+async function setAgentRunning(ctx: WorkspaceContext, agentId: string, taskName: string, routing?: import('@/types').ModelRouting[]): Promise<void> {
+  await updateAgent(agentId, {
+    status: 'running',
+    progress: 10,
+    currentTask: taskName,
+    assignedModel: assignedModelLabel(agentId, routing),
+  }, ctx)
 }
 
 async function setAgentDone(ctx: WorkspaceContext, agentId: string, lastOutput: string, confidence = 90): Promise<void> {
@@ -77,12 +83,17 @@ export async function runAgentTask(
   const customPromptDetails = normalizeCustomPromptDetails(
     options?.customPromptDetails ?? ws.customPromptDetails,
   )
+  const routing = ws.modelRouting
+  const modelFor = (agentId: string) => {
+    const task = AGENT_TASK_MAP[agentId]
+    return task ? resolveTaskModel(task, routing) : undefined
+  }
   let live = false
 
   try {
     switch (agentId) {
       case 'research': {
-        await setAgentRunning(ctx, agentId, 'Market & competitor analysis')
+        await setAgentRunning(ctx, agentId, 'Market & competitor analysis', routing)
         const { result, live: aiLive } = await withOpenAI(() =>
           generateResearch({
             industry: campaign.industry,
@@ -91,6 +102,7 @@ export async function runAgentTask(
             offer: campaign.mainOffer,
             customPromptDetails,
             brandProfile: ws.brandProfile,
+            modelConfig: modelFor(agentId),
           }),
         )
         live = aiLive
@@ -100,7 +112,7 @@ export async function runAgentTask(
         break
       }
       case 'strategy': {
-        await setAgentRunning(ctx, agentId, 'Topic & content strategy')
+        await setAgentRunning(ctx, agentId, 'Topic & content strategy', routing)
         const result = await runTraeSoloTopicGeneration({
           title: `${campaign.companyName} Strategy`,
           goal: campaign.campaignGoal,
@@ -111,6 +123,7 @@ export async function runAgentTask(
           platforms: campaign.platforms,
           topicCount: 8,
           customPromptDetails,
+          modelConfig: modelFor(agentId),
         })
         live = true
         await patchWorkspace({ topics: result.topics }, ctx)
@@ -119,7 +132,7 @@ export async function runAgentTask(
         break
       }
       case 'content': {
-        await setAgentRunning(ctx, agentId, 'Social post generation')
+        await setAgentRunning(ctx, agentId, 'Social post generation', routing)
         const topic =
           ws.topics[0]?.title ??
           ws.research?.highIntentTopics?.[0] ??
@@ -133,6 +146,7 @@ export async function runAgentTask(
             campaignId: campaign.id,
             customPromptDetails,
             brandProfile: ws.brandProfile,
+            modelConfig: modelFor(agentId),
           }),
         )
         live = aiLive
@@ -147,7 +161,7 @@ export async function runAgentTask(
         break
       }
       case 'brandtheme': {
-        await setAgentRunning(ctx, agentId, 'Extracting brand theme from URL')
+        await setAgentRunning(ctx, agentId, 'Extracting brand theme from URL', routing)
         const urlCandidate =
           options?.url?.trim() ||
           (customPromptDetails && isValidCompanyUrl(customPromptDetails) ? customPromptDetails : '') ||
@@ -157,7 +171,7 @@ export async function runAgentTask(
           throw new Error('Provide a company URL in custom instructions or run with url parameter')
         }
 
-        const theme = await extractBrandThemeFromUrl(urlCandidate)
+        const theme = await extractBrandThemeFromUrl(urlCandidate, modelFor(agentId))
         live = hasOpenAI()
         const collection = [theme, ...(ws.brandProfile.themeCollection ?? [])].slice(0, 20)
         await patchWorkspace(
@@ -188,10 +202,10 @@ export async function runAgentTask(
         break
       }
       case 'video': {
-        await setAgentRunning(ctx, agentId, 'Short-form video scripts')
+        await setAgentRunning(ctx, agentId, 'Short-form video scripts', routing)
         const topic = ws.topics[0]?.title
         const { result, live: aiLive } = await withOpenAI(() =>
-          generateVideoScripts({ topic, count: 3, customPromptDetails, brandProfile: ws.brandProfile }),
+          generateVideoScripts({ topic, count: 3, customPromptDetails, brandProfile: ws.brandProfile, modelConfig: modelFor(agentId) }),
         )
         live = aiLive
         await patchWorkspace({ videoScripts: result }, ctx)
@@ -200,10 +214,12 @@ export async function runAgentTask(
         break
       }
       case 'safety': {
-        await setAgentRunning(ctx, agentId, 'Compliance & risk checks')
+        await setAgentRunning(ctx, agentId, 'Compliance & risk checks', routing)
         const draft = ws.contentDrafts[0]
         const content = draft ? `${draft.hook}\n${draft.mainCopy}` : ''
-        const { result, live: aiLive } = await withOpenAI(() => checkBrandSafety({ content, brandProfile: ws.brandProfile }))
+        const { result, live: aiLive } = await withOpenAI(() =>
+          checkBrandSafety({ content, brandProfile: ws.brandProfile, modelConfig: modelFor(agentId) }),
+        )
         live = aiLive
         const flagged = result.flags.length
         await updateAgent(
@@ -264,10 +280,10 @@ export async function runAgentTask(
         break
       }
       case 'leadfinder': {
-        await setAgentRunning(ctx, agentId, 'Prospect discovery')
+        await setAgentRunning(ctx, agentId, 'Prospect discovery', routing)
         const criteria = ws.research?.marketSummary ?? campaign.targetAudience
         const { result, live: aiLive } = await withOpenAI(() =>
-          generateLeads({ count: 10, criteria, customPromptDetails, brandProfile: ws.brandProfile }),
+          generateLeads({ count: 10, criteria, customPromptDetails, brandProfile: ws.brandProfile, modelConfig: modelFor(agentId) }),
         )
         live = aiLive
         await patchWorkspace({ leads: result }, ctx)
@@ -276,7 +292,7 @@ export async function runAgentTask(
         break
       }
       case 'outreach': {
-        await setAgentRunning(ctx, agentId, 'Personalized messaging')
+        await setAgentRunning(ctx, agentId, 'Personalized messaging', routing)
         const lead = ws.leads.find((l) => l.score >= 85) ?? ws.leads[0]
         if (lead) {
           const { result, live: aiLive } = await withOpenAI(() =>
@@ -288,6 +304,7 @@ export async function runAgentTask(
               matchReason: lead.matchReason,
               customPromptDetails,
               brandProfile: ws.brandProfile,
+              modelConfig: modelFor(agentId),
             }),
           )
           live = aiLive

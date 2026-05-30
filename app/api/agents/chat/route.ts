@@ -1,10 +1,6 @@
 import { apiError, apiFromError, apiSuccess } from '@/lib/api-utils'
-import {
-  handleAgentChat,
-  handleBasicChat,
-  type ChatMessage,
-  type ChatMode,
-} from '@/lib/agents/orchestrator'
+import { handleAgentChat, handleBasicChat } from '@/lib/agents/orchestrator'
+import type { ChatMessage, ChatMode } from '@/lib/agents/types'
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}))

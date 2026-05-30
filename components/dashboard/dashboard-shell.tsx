@@ -39,6 +39,7 @@ import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/s
 import { isDemoMode } from '@/lib/demo/mode'
 import { AgentChat } from '@/components/agents/agent-chat'
 import { CommandPalette, useCommandPalette } from '@/components/dashboard/command-palette'
+import { DashboardDemoTour } from '@/components/demo/dashboard-demo-tour'
 import { dashboardNavGroups, dashboardQuickActions, getPageMeta } from '@/lib/dashboard/nav'
 
 interface DashboardShellProps {
@@ -306,7 +307,10 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
           </DropdownMenu>
         </header>
 
-        <main className="flex-1 overflow-auto p-5 lg:p-7">{children}</main>
+        <main className="flex-1 overflow-auto p-5 lg:p-7">
+          <DashboardDemoTour />
+          {children}
+        </main>
       </div>
 
       {pathname !== '/dashboard/chat' && (

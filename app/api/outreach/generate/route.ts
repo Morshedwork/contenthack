@@ -1,6 +1,7 @@
 import { apiFromError, apiSuccess } from '@/lib/api-utils'
 import { withOpenAI } from '@/lib/ai/openai'
 import { generateOutreach } from '@/lib/ai/generate'
+import { MODEL_TASK, resolveTaskModel } from '@/lib/models/routing'
 import { getWorkspace, patchWorkspace } from '@/lib/workspace/store'
 
 export async function POST(request: Request) {
@@ -8,6 +9,7 @@ export async function POST(request: Request) {
     const body = await request.json().catch(() => ({}))
     const ws = await getWorkspace()
     const lead = ws.leads.find((l) => l.id === body.leadId)
+    const modelConfig = resolveTaskModel(MODEL_TASK.OUTREACH_WRITING, ws.modelRouting)
 
     const { result: outreach, live } = await withOpenAI(() =>
       generateOutreach({
@@ -18,6 +20,7 @@ export async function POST(request: Request) {
         matchReason: body.matchReason || lead?.matchReason,
         customPromptDetails: body.customPromptDetails,
         brandProfile: ws.brandProfile,
+        modelConfig,
       }),
     )
 

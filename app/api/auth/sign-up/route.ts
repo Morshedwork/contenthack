@@ -1,6 +1,5 @@
 import { apiError, apiSuccess } from '@/lib/api-utils'
 import { confirmUserEmail, createConfirmedUser } from '@/lib/supabase/admin-auth'
-import { createClient } from '@/lib/supabase/server'
 
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}))
@@ -28,16 +27,6 @@ export async function POST(request: Request) {
       } else {
         return apiError(createError.message, 400)
       }
-    }
-
-    const supabase = await createClient()
-    const { error: signInError } = await supabase.auth.signInWithPassword({
-      email,
-      password,
-    })
-
-    if (signInError) {
-      return apiError(signInError.message, 400)
     }
 
     return apiSuccess({ ok: true })

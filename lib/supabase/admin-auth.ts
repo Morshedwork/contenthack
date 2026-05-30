@@ -1,26 +1,23 @@
 import 'server-only'
 
 import { createAdminClient } from '@/lib/supabase/admin'
-import { getSupabaseServiceEnv } from '@/lib/supabase/env'
 
 export async function getUserIdByEmail(email: string): Promise<string | null> {
-  const env = getSupabaseServiceEnv()
-  if (!env) return null
+  const admin = createAdminClient()
+  let page = 1
 
-  const res = await fetch(
-    `${env.url}/auth/v1/admin/users?filter=${encodeURIComponent(`email.eq.${email}`)}`,
-    {
-      headers: {
-        Authorization: `Bearer ${env.serviceKey}`,
-        apikey: env.serviceKey,
-      },
-    },
-  )
+  while (page <= 10) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage: 200 })
+    if (error || !data.users.length) return null
 
-  if (!res.ok) return null
+    const user = data.users.find((u) => u.email?.toLowerCase() === email.toLowerCase())
+    if (user) return user.id
 
-  const json = (await res.json()) as { users?: { id: string }[] }
-  return json.users?.[0]?.id ?? null
+    if (data.users.length < 200) break
+    page++
+  }
+
+  return null
 }
 
 export async function confirmUserEmail(email: string): Promise<boolean> {

@@ -3,7 +3,7 @@ import 'server-only'
 import { runAgentTask, executeFullWorkflow } from '@/lib/agents/engine'
 import { normalizeCustomPromptDetails } from '@/lib/ai/prompt-utils'
 import { generateJSON, generateText, getOpenAI, hasOpenAI, withOpenAI } from '@/lib/ai/openai'
-import { getChatWelcomeMessage, type ChatMode } from '@/lib/agents/chat-messages'
+import type { ChatActionExecuted, ChatMessage, ChatMode, ChatResponse } from '@/lib/agents/types'
 import { getWorkspace, patchWorkspace } from '@/lib/workspace/store'
 import { resolveWorkspaceContext } from '@/lib/workspace/context'
 import type { AgentDefinition } from '@/types'
@@ -23,29 +23,6 @@ export const AGENT_CATALOG = [
 ] as const
 
 export type AgentId = (typeof AGENT_CATALOG)[number]['id']
-
-export interface ChatMessage {
-  role: 'user' | 'assistant'
-  content: string
-}
-
-export interface ChatActionExecuted {
-  type: 'run_agent' | 'run_workflow' | 'status' | 'set_prompt'
-  agentIds?: string[]
-  results?: { agentId: string; agentName: string; status: string; lastOutput: string }[]
-  workflowId?: string
-  estimatedTimeSaved?: string
-}
-
-export interface ChatResponse {
-  message: string
-  actionsExecuted: ChatActionExecuted[]
-  agents: AgentDefinition[]
-  live: boolean
-}
-
-export type { ChatMode } from '@/lib/agents/chat-messages'
-export { getChatWelcomeMessage } from '@/lib/agents/chat-messages'
 
 interface ParsedIntent {
   action: 'run_agents' | 'run_full_workflow' | 'get_status' | 'set_custom_prompt' | 'respond_only'

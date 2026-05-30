@@ -1,5 +1,6 @@
 'use client'
 
+import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -43,6 +44,11 @@ export default function SignUpPage() {
       if (!res.ok || !json.success) {
         throw new Error(json.error ?? 'Sign up failed')
       }
+
+      const supabase = createClient()
+      const { error: signInError } = await supabase.auth.signInWithPassword({ email, password })
+      if (signInError) throw signInError
+
       router.push('/dashboard')
       router.refresh()
     } catch (error: unknown) {

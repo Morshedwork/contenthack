@@ -93,9 +93,9 @@ export const dashboardNavGroups: NavGroup[] = [
 ]
 
 export const dashboardQuickActions = [
+  { label: 'Investor Pitch Demo', href: '/dashboard/campaign-builder', icon: Target, description: 'Load full fundraise walkthrough' },
   { label: 'Run Full Workflow', href: '/dashboard/agents', icon: Zap, description: 'Execute all agents end-to-end' },
   { label: 'Open AI Chat', href: '/dashboard/chat', icon: MessageSquare, description: 'Control agents with prompts' },
-  { label: 'New Campaign', href: '/dashboard/campaign-builder', icon: Target, description: 'Start a new campaign' },
   { label: 'Review Approvals', href: '/dashboard/approval', icon: CheckSquare, description: 'Content awaiting review' },
 ] as const
 

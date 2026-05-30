@@ -44,6 +44,16 @@ export async function resolveWorkspaceContext(options?: {
     return { userId: user.id, workspaceId: existing.id }
   }
 
+  // Ensure public.users row exists (may be missing for users created before trigger)
+  await admin.from('users').upsert(
+    {
+      id: user.id,
+      email: user.email ?? '',
+      full_name: user.user_metadata?.full_name ?? null,
+    },
+    { onConflict: 'id' },
+  )
+
   const { data: created, error } = await admin
     .from('workspaces')
     .insert({ name: 'My Workspace', owner_id: user.id })
@@ -51,6 +61,18 @@ export async function resolveWorkspaceContext(options?: {
     .single()
 
   if (error || !created) {
+    const { data: retry } = await admin
+      .from('workspaces')
+      .select('id')
+      .eq('owner_id', user.id)
+      .order('created_at', { ascending: true })
+      .limit(1)
+      .maybeSingle()
+
+    if (retry?.id) {
+      return { userId: user.id, workspaceId: retry.id }
+    }
+
     throw new Error(error?.message ?? 'Failed to create workspace')
   }
 

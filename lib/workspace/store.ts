@@ -39,7 +39,10 @@ import {
   demoSafetySettings,
   demoVideoScripts,
 } from '@/lib/demo/data'
+import { assignedModelLabel } from '@/lib/models/routing'
 import { isDemoMode } from '@/lib/demo/mode'
+import { buildInvestorPitchWorkspaceSlice } from '@/lib/demo/investor-pitch'
+import type { DemoPresetId } from '@/lib/demo/presets'
 import { loadConnectedPlatforms, mergeIntegrationConnectionState } from '@/lib/integrations/store'
 import { DEMO_WORKSPACE_ID, resolveWorkspaceContext, type WorkspaceContext } from '@/lib/workspace/context'
 import { hasSupabasePersistence, loadWorkspaceState, saveWorkspaceState } from '@/lib/workspace/persistence'
@@ -92,9 +95,10 @@ function emptyCampaign(): Campaign {
   }
 }
 
-function idleAgents(): AgentDefinition[] {
+function idleAgents(routing = demoModelRouting): AgentDefinition[] {
   return demoAgents.map((a) => ({
     ...a,
+    assignedModel: assignedModelLabel(a.id, routing),
     status: 'idle' as const,
     progress: 0,
     confidence: 0,
@@ -200,6 +204,25 @@ export async function getWorkspace(ctx?: WorkspaceContext, options?: { allowAnon
 export async function resetWorkspace(ctx?: WorkspaceContext): Promise<WorkspaceState> {
   const resolved = await ensureContext(ctx)
   const state = isDemoMode() ? cloneDemoDefaults() : createEmptyWorkspace()
+  await persist(resolved, state)
+  return state
+}
+
+function buildPresetState(presetId: DemoPresetId): WorkspaceState {
+  switch (presetId) {
+    case 'investor-pitch':
+      return { ...createEmptyWorkspace(), ...buildInvestorPitchWorkspaceSlice() }
+    case 'empty':
+      return createEmptyWorkspace()
+    case 'default':
+    default:
+      return cloneDemoDefaults()
+  }
+}
+
+export async function loadDemoPreset(presetId: DemoPresetId, ctx?: WorkspaceContext): Promise<WorkspaceState> {
+  const resolved = await ensureContext(ctx)
+  const state = buildPresetState(presetId)
   await persist(resolved, state)
   return state
 }

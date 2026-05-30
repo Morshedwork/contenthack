@@ -7,7 +7,19 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Textarea } from '@/components/ui/textarea'
 import { Label } from '@/components/ui/label'
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CustomPromptPanel } from '@/components/shared/custom-prompt-panel'
+import {
+  IMAGE_ASPECT_RATIOS,
+  IMAGE_PROMPT_MODELS,
+  OPENAI_RENDER_MODELS,
+  POLLINATIONS_RENDER_MODELS,
+  getImageRenderProvider,
+  type ImageAspectRatioId,
+  type ImagePromptModelId,
+  type ImageRenderModelId,
+} from '@/lib/models/media-options'
+import { SelectGroup, SelectLabel } from '@/components/ui/select'
 import { BrandThemeReferenceSelect } from '@/components/brand/brand-theme-reference-select'
 import { useWorkspace } from '@/hooks/use-workspace'
 import type { GeneratedImage } from '@/types'
@@ -17,6 +29,11 @@ import { toast } from 'sonner'
 export default function ImageStudioPage() {
   const { data, refresh } = useWorkspace()
   const [prompt, setPrompt] = useState('')
+  const [promptModel, setPromptModel] = useState<ImagePromptModelId>('kimi-k2.5')
+  const [renderModel, setRenderModel] = useState<ImageRenderModelId>('flux')
+  const [openaiQuality, setOpenaiQuality] = useState<'standard' | 'hd'>('standard')
+  const [aspectRatio, setAspectRatio] = useState<ImageAspectRatioId>('1:1')
+  const isOpenAIRender = getImageRenderProvider(renderModel) === 'openai'
   const [customPromptDetails, setCustomPromptDetails] = useState('')
   const [brandThemeId, setBrandThemeId] = useState('')
   const [images, setImages] = useState<GeneratedImage[]>([])
@@ -39,6 +56,10 @@ export default function ImageStudioPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt: prompt.trim(),
+          promptModel,
+          renderModel,
+          aspectRatio,
+          openaiQuality: isOpenAIRender && renderModel === 'dall-e-3' ? openaiQuality : undefined,
           customPromptDetails: customPromptDetails.trim() || undefined,
           brandThemeId: brandThemeId && brandThemeId !== 'none' ? brandThemeId : undefined,
         }),
@@ -50,7 +71,7 @@ export default function ImageStudioPage() {
       await refresh()
       toast.success(
         json.data.live
-          ? 'Image generated with Kimi K2.5'
+          ? `Image generated · ${renderModel} render`
           : 'Demo image generated — set KIMI_API_KEY for live generation',
       )
     } catch (err) {
@@ -74,7 +95,7 @@ export default function ImageStudioPage() {
         <div>
           <h1 className="text-2xl md:text-3xl font-display tracking-tight mb-1">Image Studio</h1>
           <p className="text-muted-foreground text-sm">
-            AI image generation powered by Kimi K2.5 (Moonshot AI)
+            OpenAI (DALL·E 3, GPT Image) and Pollinations (Flux, Klein) — with Kimi or GPT prompt enhancement
           </p>
         </div>
         <div className="flex items-center gap-2">
@@ -86,7 +107,7 @@ export default function ImageStudioPage() {
           </Button>
           <Badge variant="secondary" className="w-fit gap-1.5 py-1.5 px-3">
             <ImageIcon className="size-3.5" />
-            Kimi K2.5
+            {renderModel} · {promptModel}
           </Badge>
         </div>
       </div>
@@ -109,6 +130,90 @@ export default function ImageStudioPage() {
               rows={3}
             />
           </div>
+          <div className={`grid grid-cols-1 gap-3 ${renderModel === 'dall-e-3' ? 'sm:grid-cols-4' : 'sm:grid-cols-3'}`}>
+            <div className="flex flex-col gap-1.5">
+              <Label>Prompt model</Label>
+              <Select value={promptModel} onValueChange={(v) => setPromptModel(v as ImagePromptModelId)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>OpenAI</SelectLabel>
+                    {IMAGE_PROMPT_MODELS.filter((m) => m.provider === 'openai').map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                  <SelectGroup>
+                    <SelectLabel>Moonshot (Kimi)</SelectLabel>
+                    {IMAGE_PROMPT_MODELS.filter((m) => m.provider === 'kimi').map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>Image model</Label>
+              <Select value={renderModel} onValueChange={(v) => setRenderModel(v as ImageRenderModelId)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  <SelectGroup>
+                    <SelectLabel>OpenAI</SelectLabel>
+                    {OPENAI_RENDER_MODELS.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                  <SelectGroup>
+                    <SelectLabel>Pollinations</SelectLabel>
+                    {POLLINATIONS_RENDER_MODELS.map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                </SelectContent>
+              </Select>
+            </div>
+            <div className="flex flex-col gap-1.5">
+              <Label>Aspect ratio</Label>
+              <Select value={aspectRatio} onValueChange={(v) => setAspectRatio(v as ImageAspectRatioId)}>
+                <SelectTrigger><SelectValue /></SelectTrigger>
+                <SelectContent>
+                  {IMAGE_ASPECT_RATIOS.map((ar) => (
+                    <SelectItem key={ar.id} value={ar.id}>
+                      {ar.label}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+            {renderModel === 'dall-e-3' && (
+              <div className="flex flex-col gap-1.5">
+                <Label>DALL·E quality</Label>
+                <Select
+                  value={openaiQuality}
+                  onValueChange={(v) => setOpenaiQuality(v as 'standard' | 'hd')}
+                >
+                  <SelectTrigger><SelectValue /></SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="standard">Standard</SelectItem>
+                    <SelectItem value="hd">HD</SelectItem>
+                  </SelectContent>
+                </Select>
+              </div>
+            )}
+          </div>
+          <p className="text-[11px] text-muted-foreground -mt-1">
+            {IMAGE_PROMPT_MODELS.find((m) => m.id === promptModel)?.description}
+            {' · '}
+            {[...OPENAI_RENDER_MODELS, ...POLLINATIONS_RENDER_MODELS].find((m) => m.id === renderModel)?.description}
+            {isOpenAIRender ? ' · Requires OPENAI_API_KEY' : ' · Pollinations render (free)'}
+          </p>
           <BrandThemeReferenceSelect
             brandProfile={data?.brandProfile}
             value={brandThemeId || data?.brandProfile?.activeThemeId || 'none'}

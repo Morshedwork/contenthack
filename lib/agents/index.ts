@@ -1,3 +1,5 @@
+import 'server-only'
+
 import type { AgentDefinition, AgentTask } from '@/types'
 import { getWorkspace, patchWorkspace } from '@/lib/workspace/store'
 import { buildApprovalItems, buildOverviewKPIs, computeDynamicROI } from '@/lib/workspace/store'

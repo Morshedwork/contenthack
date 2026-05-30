@@ -1,8 +1,28 @@
-import type { BrandProfile, GeneratedImage, GeneratedVideo, ExtractedBrandTheme } from '@/types'
+import type { BrandProfile, GeneratedImage, GeneratedVideo, ExtractedBrandTheme, ModelRouting } from '@/types'
 import { DEMO_COMPANY, demoBrandProfile } from '@/lib/demo/data'
 import { buildThemePromptContext, resolveBrandTheme } from '@/lib/brand/theme-context'
+import { MODEL_TASK, resolveMediaModel } from '@/lib/models/routing'
+import type { KimiImagePrompt } from './kimi'
+import {
+  getImagePromptProvider,
+  getImageRenderProvider,
+  isOpenAIRenderModel,
+  isPollinationsRenderModel,
+  isValidImagePromptModel,
+  toOpenAIImageModel,
+  toPollinationsModel,
+  type ImageAspectRatioId,
+  type ImagePromptModelId,
+  type ImageRenderModelId,
+} from '@/lib/models/media-options'
+import { modelDisplayNameToId } from '@/lib/models/routing'
 import { enhanceImagePrompt, hasKimi, renderImageFromPrompt } from './kimi'
-import { generateVideo, hasPixverse } from './pixverse'
+import {
+  enhanceImagePromptWithOpenAI,
+  hasOpenAIImage,
+  renderImageWithOpenAI,
+} from './openai-image'
+import { generateVideo, hasPixverse, type PixverseModel, type PixverseQuality } from './pixverse'
 
 function buildBrandContext(profile?: BrandProfile, theme?: ExtractedBrandTheme): string {
   const p = profile ?? demoBrandProfile
@@ -16,35 +36,122 @@ Offer: ${p.mainOffer}`
 
 const id = (prefix: string) => `${prefix}-${Date.now().toString(36)}`
 
+function resolvePromptModelId(
+  explicit?: ImagePromptModelId,
+  modelRouting?: ModelRouting[],
+): ImagePromptModelId {
+  if (explicit && isValidImagePromptModel(explicit)) return explicit
+  const routed = resolveMediaModel(MODEL_TASK.IMAGE_GENERATION, modelRouting)
+  const normalized = modelDisplayNameToId(routed)
+  if (isValidImagePromptModel(normalized)) return normalized
+  if (isValidImagePromptModel(routed)) return routed
+  return 'kimi-k2.5'
+}
+
+async function buildImageBrief(input: {
+  prompt: string
+  brandContext: string
+  customPromptDetails?: string
+  promptModel?: ImagePromptModelId
+  modelRouting?: ModelRouting[]
+}): Promise<{ brief: KimiImagePrompt; promptModelLabel: string }> {
+  const promptModelId = resolvePromptModelId(input.promptModel, input.modelRouting)
+  const promptProvider = getImagePromptProvider(promptModelId) || 'kimi'
+
+  if (promptProvider === 'openai') {
+    if (!hasOpenAIImage()) {
+      throw new Error('OPENAI_API_KEY is required for GPT prompt enhancement.')
+    }
+    const brief = await enhanceImagePromptWithOpenAI({
+      prompt: input.prompt,
+      brandContext: input.brandContext,
+      customPromptDetails: input.customPromptDetails,
+      model: promptModelId,
+    })
+    return { brief, promptModelLabel: promptModelId }
+  }
+
+  if (!hasKimi()) {
+    throw new Error('KIMI_API_KEY is required for Kimi prompt enhancement.')
+  }
+  const brief = await enhanceImagePrompt({
+    prompt: input.prompt,
+    brandContext: input.brandContext,
+    customPromptDetails: input.customPromptDetails,
+    model: promptModelId,
+  })
+  return { brief, promptModelLabel: promptModelId }
+}
+
 export async function generateMarketingImage(input: {
   prompt: string
   brandProfile?: BrandProfile
   brandThemeId?: string
   customPromptDetails?: string
+  promptModel?: ImagePromptModelId
+  renderModel?: ImageRenderModelId
+  aspectRatio?: ImageAspectRatioId
+  openaiQuality?: 'standard' | 'hd'
+  modelRouting?: ModelRouting[]
 }): Promise<GeneratedImage> {
-  if (!hasKimi()) {
-    throw new Error('KIMI_API_KEY is required for image generation. Add it to your .env.local file.')
+  const renderModelId = input.renderModel || 'flux'
+  const renderProvider = getImageRenderProvider(renderModelId) || 'pollinations'
+  const promptModelId = resolvePromptModelId(input.promptModel, input.modelRouting)
+  const promptProvider = getImagePromptProvider(promptModelId) || 'kimi'
+
+  if (renderProvider === 'openai' && !hasOpenAIImage()) {
+    throw new Error('OPENAI_API_KEY is required for OpenAI image models. Add it to your .env.local file.')
+  }
+  if (promptProvider === 'kimi' && !hasKimi()) {
+    throw new Error('KIMI_API_KEY is required for Kimi prompt enhancement.')
+  }
+  if (promptProvider === 'openai' && !hasOpenAIImage()) {
+    throw new Error('OPENAI_API_KEY is required for GPT prompt enhancement.')
   }
 
   const theme = resolveBrandTheme(input.brandProfile, input.brandThemeId)
   const brandContext = buildBrandContext(input.brandProfile, theme)
-  const brief = await enhanceImagePrompt({
+  const { brief, promptModelLabel } = await buildImageBrief({
     prompt: input.prompt,
     brandContext,
     customPromptDetails: input.customPromptDetails,
+    promptModel: input.promptModel,
+    modelRouting: input.modelRouting,
   })
 
-  const imageUrl = await renderImageFromPrompt(brief.enhancedPrompt, brief.aspectRatio)
+  const aspectRatio = input.aspectRatio || brief.aspectRatio
+  let imageUrl: string
+  let provider: string
+
+  if (isOpenAIRenderModel(renderModelId)) {
+    imageUrl = await renderImageWithOpenAI(
+      brief.enhancedPrompt,
+      toOpenAIImageModel(renderModelId),
+      aspectRatio,
+      { quality: input.openaiQuality },
+    )
+    provider = 'OpenAI'
+  } else if (isPollinationsRenderModel(renderModelId)) {
+    imageUrl = await renderImageFromPrompt(brief.enhancedPrompt, aspectRatio, {
+      renderModel: toPollinationsModel(renderModelId),
+      negativePrompt: brief.negativePrompt,
+    })
+    provider = 'Pollinations'
+  } else {
+    throw new Error(`Unknown image render model: ${renderModelId}`)
+  }
+
+  const modelLabel = `${renderModelId} · ${promptModelLabel}`
 
   return {
     id: id('img'),
     prompt: input.prompt,
     enhancedPrompt: brief.enhancedPrompt,
     style: brief.style,
-    aspectRatio: brief.aspectRatio,
+    aspectRatio,
     imageUrl,
-    model: 'kimi-k2.5',
-    provider: 'Moonshot AI',
+    model: modelLabel,
+    provider,
     status: 'completed',
     createdAt: new Date().toISOString(),
   }
@@ -52,17 +159,22 @@ export async function generateMarketingImage(input: {
 
 export async function generateMarketingVideo(input: {
   prompt: string
-  model?: 'v4.5' | 'v5' | 'v6'
+  model?: PixverseModel
   duration?: number
-  aspectRatio?: '16:9' | '9:16' | '1:1'
+  quality?: PixverseQuality
+  aspectRatio?: '16:9' | '9:16' | '1:1' | '4:3' | '3:4'
   brandProfile?: BrandProfile
   brandThemeId?: string
   customPromptDetails?: string
   wait?: boolean
+  modelRouting?: ModelRouting[]
 }): Promise<GeneratedVideo> {
   if (!hasPixverse()) {
     throw new Error('PIXVERSE_API_KEY is required for video generation. Add it to your .env.local file.')
   }
+
+  const pixverseModel = (input.model ||
+    resolveMediaModel(MODEL_TASK.VIDEO_GENERATION, input.modelRouting)) as PixverseModel
 
   const theme = resolveBrandTheme(input.brandProfile, input.brandThemeId)
   const brandContext = buildBrandContext(input.brandProfile, theme)
@@ -72,8 +184,9 @@ export async function generateMarketingVideo(input: {
 
   const { videoId, url, status } = await generateVideo({
     prompt: fullPrompt,
-    model: input.model || 'v4.5',
+    model: pixverseModel,
     duration: input.duration ?? 5,
+    quality: input.quality || '540p',
     aspectRatio: input.aspectRatio || '16:9',
     wait: input.wait !== false,
   })
@@ -83,7 +196,7 @@ export async function generateMarketingVideo(input: {
     prompt: input.prompt,
     videoUrl: url,
     videoId,
-    model: `pixverse-${input.model || 'v4.5'}`,
+    model: `pixverse-${pixverseModel}`,
     provider: 'PixVerse',
     duration: input.duration ?? 5,
     aspectRatio: input.aspectRatio || '16:9',
@@ -93,5 +206,5 @@ export async function generateMarketingVideo(input: {
 }
 
 export function mediaProvidersAvailable() {
-  return { kimi: hasKimi(), pixverse: hasPixverse() }
+  return { kimi: hasKimi(), openai: hasOpenAIImage(), pixverse: hasPixverse() }
 }

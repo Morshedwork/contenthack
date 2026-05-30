@@ -1,12 +1,14 @@
 import { apiFromError, apiSuccess } from '@/lib/api-utils'
 import { withOpenAI } from '@/lib/ai/openai'
 import { generateResearch } from '@/lib/ai/generate'
+import { MODEL_TASK, resolveTaskModel } from '@/lib/models/routing'
 import { getWorkspace, patchWorkspace } from '@/lib/workspace/store'
 
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}))
     const ws = await getWorkspace()
+    const modelConfig = resolveTaskModel(MODEL_TASK.MARKET_RESEARCH, ws.modelRouting)
 
     const { result: research, live } = await withOpenAI(() =>
       generateResearch({
@@ -16,6 +18,7 @@ export async function POST(request: Request) {
         offer: body.offer || ws.campaign.mainOffer,
         customPromptDetails: body.customPromptDetails,
         brandProfile: ws.brandProfile,
+        modelConfig,
       }),
     )
 

@@ -1,7 +1,6 @@
 import { apiError, apiSuccess } from '@/lib/api-utils'
 import { confirmUserEmail } from '@/lib/supabase/admin-auth'
 
-/** Confirms email so the client can sign in with the browser Supabase client. */
 export async function POST(request: Request) {
   const body = await request.json().catch(() => ({}))
   const email = body?.email as string | undefined
@@ -11,9 +10,12 @@ export async function POST(request: Request) {
   }
 
   try {
-    await confirmUserEmail(email)
+    const ok = await confirmUserEmail(email)
+    if (!ok) {
+      return apiError('User not found', 404)
+    }
     return apiSuccess({ ok: true })
   } catch (err) {
-    return apiError(err instanceof Error ? err.message : 'Sign in prep failed', 500)
+    return apiError(err instanceof Error ? err.message : 'Confirmation failed', 500)
   }
 }

@@ -3,6 +3,7 @@ import 'server-only'
 import type { BrandThemeColor, ExtractedBrandTheme } from '@/types'
 import { normalizeHex } from '@/lib/brand/theme-context'
 import { generateJSON, hasOpenAI } from '@/lib/ai/openai'
+import { MODEL_TASK, resolveTaskModel, type TaskModelConfig } from '@/lib/models/routing'
 
 interface ThemeAnalysis {
   companyName: string
@@ -179,7 +180,10 @@ function demoThemeFromHostname(
   }
 }
 
-export async function extractBrandThemeFromUrl(urlInput: string): Promise<ExtractedBrandTheme> {
+export async function extractBrandThemeFromUrl(
+  urlInput: string,
+  modelConfig?: TaskModelConfig,
+): Promise<ExtractedBrandTheme> {
   const sourceUrl = normalizeUrl(urlInput)
   const hostname = new URL(sourceUrl).hostname.replace(/^www\./, '')
   const id = `theme-${Date.now().toString(36)}`
@@ -198,7 +202,12 @@ export async function extractBrandThemeFromUrl(urlInput: string): Promise<Extrac
   }
 
   if (hasOpenAI()) {
+    const mc = modelConfig ?? resolveTaskModel(MODEL_TASK.CONTENT_GENERATION)
     const analysis = await generateJSON<ThemeAnalysis>({
+      model: mc.model,
+      fallbackModel: mc.fallbackModel,
+      temperature: mc.temperature,
+      maxTokens: mc.maxTokens,
       system:
         'You are a brand identity analyst. Extract a cohesive brand theme palette and visual direction from website signals. Always return valid JSON with hex colors.',
       user: `Analyze brand theme for: ${sourceUrl}
@@ -218,8 +227,6 @@ Return JSON:
   "mood": "e.g. professional, playful",
   "notes": "brief brand visual notes for image/video generation"
 }`,
-      temperature: 0.3,
-      maxTokens: 1024,
     })
 
     return {

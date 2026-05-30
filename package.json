@@ -9,7 +9,8 @@
     "lint": "eslint .",
     "db:push": "node scripts/apply-schema.mjs",
     "mcp:contentops": "node scripts/trae-contentops-mcp.mjs",
-    "deck": "node scripts/generate-pitch-deck.mjs"
+    "deck": "node scripts/generate-pitch-deck.mjs",
+    "pitch:video": "node scripts/generate-video-pitch.mjs"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
