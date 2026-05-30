@@ -15,6 +15,8 @@ import { Badge } from '@/components/ui/badge'
 import { FileText, Sparkles, Workflow } from 'lucide-react'
 import { toast } from 'sonner'
 import { DemoCampaignPicker } from '@/components/demo/demo-campaign-picker'
+import { QuickDemoStart } from '@/components/demo/quick-demo-start'
+import { isDemoMode } from '@/lib/demo/mode'
 import { INVESTOR_PITCH_CAMPAIGN_ID } from '@/lib/demo/investor-pitch'
 import type { DemoPresetId } from '@/lib/demo/presets'
 
@@ -76,7 +78,7 @@ export default function CampaignBuilderPage() {
       setGenerated(true)
       toast.success('Campaign plan generated — 11 workflow tasks created')
     } catch {
-      await new Promise((r) => setTimeout(r, 1500))
+      await new Promise((r) => setTimeout(r, isDemoMode() ? 350 : 1500))
       setGenerated(true)
       toast.success('Campaign plan generated — 11 workflow tasks created')
     } finally {
@@ -94,10 +96,17 @@ export default function CampaignBuilderPage() {
       </div>
 
       <section className="mb-8">
-        <h2 className="text-sm font-medium mb-1">Demo campaigns</h2>
-        <p className="text-sm text-muted-foreground mb-4">
-          Load a pre-built workspace for investor pitches or client demos — full pipeline data included.
-        </p>
+        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 mb-4">
+          <div>
+            <h2 className="text-sm font-medium mb-1">Campaign demo</h2>
+            <p className="text-sm text-muted-foreground">
+              One click loads a full pipeline — no forms to fill first.
+            </p>
+          </div>
+          {activePreset !== 'investor-pitch' && (
+            <QuickDemoStart onLoaded={refresh} size="default" className="shrink-0" />
+          )}
+        </div>
         <DemoCampaignPicker activePreset={activePreset} onLoaded={refresh} />
       </section>
 

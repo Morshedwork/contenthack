@@ -104,8 +104,8 @@ export function HeroSection() {
 
           <div className="mt-10 flex flex-col gap-3 sm:flex-row sm:items-center">
             <Button asChild size="lg" className="rounded-full px-8 shadow-lg shadow-violet-500/20">
-              <Link href="/dashboard">
-                Launch Demo Dashboard
+              <Link href="/dashboard?demo=quick">
+                Start 2-min demo
                 <ArrowRight data-icon="inline-end" />
               </Link>
             </Button>

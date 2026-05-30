@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
 import { DEMO_PRESETS, type DemoPresetId } from '@/lib/demo/presets'
 import { loadDemoPresetClient } from '@/lib/workspace/client'
+import { setDemoTourMode } from '@/lib/demo/tour-mode'
+import { QuickDemoStart } from '@/components/demo/quick-demo-start'
 import { cn } from '@/lib/utils'
 import { Briefcase, Loader2, Presentation, Sparkles, Trash2 } from 'lucide-react'
 import { toast } from 'sonner'
@@ -30,10 +32,11 @@ export function DemoCampaignPicker({ activePreset, onLoaded, compact }: DemoCamp
   const handleLoad = async (presetId: DemoPresetId) => {
     setLoadingId(presetId)
     try {
+      if (presetId === 'investor-pitch') setDemoTourMode('quick')
       await loadDemoPresetClient(presetId)
       toast.success(
         presetId === 'investor-pitch'
-          ? 'Investor pitch demo loaded — follow the tour from Overview'
+          ? 'Demo loaded — 3 stops from Overview (~2 min)'
           : presetId === 'empty'
             ? 'Blank workspace ready'
             : 'Cognisor demo campaign loaded',
@@ -51,6 +54,20 @@ export function DemoCampaignPicker({ activePreset, onLoaded, compact }: DemoCamp
   }
 
   return (
+    <div className="flex flex-col gap-4">
+      <div className="rounded-xl border border-violet-500/40 bg-violet-500/10 p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+        <div>
+          <p className="font-medium text-sm">Fastest path</p>
+          <p className="text-sm text-muted-foreground mt-0.5">
+            One click — full campaign + 3-stop tour (~2 min).
+          </p>
+        </div>
+        <QuickDemoStart onLoaded={onLoaded} size="default" className="shrink-0 w-full sm:w-auto" />
+      </div>
+      <details className={cn(compact && 'hidden')}>
+        <summary className="text-sm text-muted-foreground cursor-pointer hover:text-foreground mb-3">
+          More demo presets
+        </summary>
     <div className={cn('grid gap-4', compact ? 'grid-cols-1' : 'grid-cols-1 md:grid-cols-3')}>
       {DEMO_PRESETS.map((preset) => {
         const Icon = presetIcons[preset.id]
@@ -106,6 +123,8 @@ export function DemoCampaignPicker({ activePreset, onLoaded, compact }: DemoCamp
           </Card>
         )
       })}
+    </div>
+      </details>
     </div>
   )
 }

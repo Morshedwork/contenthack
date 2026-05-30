@@ -12,12 +12,12 @@ export interface DemoPresetMeta {
 export const DEMO_PRESETS: DemoPresetMeta[] = [
   {
     id: 'investor-pitch',
-    title: 'Investor Pitch Demo',
-    subtitle: 'Full pipeline · seed raise narrative',
+    title: 'Campaign Demo',
+    subtitle: '3 stops · ~2 min',
     description:
-      'Pre-loaded ContentOps AI fundraise campaign: research, content, approval, calendar, VC leads, outreach, and ROI — ready for a live walkthrough.',
-    badge: 'Recommended for pitches',
-    estimatedMinutes: 12,
+      'One click — full campaign loaded. Overview → Content → Leads in about 2 minutes.',
+    badge: 'Fastest start',
+    estimatedMinutes: 2,
   },
   {
     id: 'default',

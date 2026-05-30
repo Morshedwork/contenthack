@@ -69,6 +69,13 @@ export async function patchWorkspaceClient(body: Record<string, unknown>): Promi
   )
 }
 
-export async function loadDemoPresetClient(preset: 'default' | 'investor-pitch' | 'empty'): Promise<WorkspacePayload> {
+export async function loadDemoPresetClient(
+  preset: 'default' | 'investor-pitch' | 'empty',
+): Promise<WorkspacePayload> {
   return patchWorkspaceClient({ action: 'loadPreset', preset })
+}
+
+/** Loads investor-pitch data — use with setDemoTourMode from @/lib/demo/tour-mode */
+export async function loadQuickCampaignDemoClient(): Promise<WorkspacePayload> {
+  return loadDemoPresetClient('investor-pitch')
 }

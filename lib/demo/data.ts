@@ -87,7 +87,7 @@ export const demoModelRouting: ModelRouting[] = [
   { taskType: 'Content generation', assignedModel: 'GPT-4o', fallbackModel: 'GPT-4o mini', temperature: 0.7, maxTokens: 2048, costEstimate: '$0.05/post', qualityPriority: 'balanced' },
   { taskType: 'Video scripts', assignedModel: 'GPT-4.1 mini', fallbackModel: 'GPT-4o', temperature: 0.8, maxTokens: 3072, costEstimate: '$0.04/script', qualityPriority: 'balanced' },
   { taskType: 'Brand safety', assignedModel: 'o4-mini', fallbackModel: 'GPT-4o', temperature: 0.1, maxTokens: 1024, costEstimate: '$0.03/check', qualityPriority: 'quality' },
-  { taskType: 'Lead scoring', assignedModel: 'o4-mini', fallbackModel: 'GPT-4o mini', temperature: 0.2, maxTokens: 1024, costEstimate: '$0.02/lead', qualityPriority: 'speed' },
+  { taskType: 'Lead scoring', assignedModel: 'o4-mini', fallbackModel: 'GPT-4o mini', temperature: 0.2, maxTokens: 4096, costEstimate: '$0.02/lead', qualityPriority: 'speed' },
   { taskType: 'Outreach writing', assignedModel: 'GPT-4o', fallbackModel: 'GPT-4.1', temperature: 0.6, maxTokens: 1536, costEstimate: '$0.04/message', qualityPriority: 'quality' },
   { taskType: 'Analytics summary', assignedModel: 'GPT-4o mini', fallbackModel: 'GPT-4.1 mini', temperature: 0.3, maxTokens: 2048, costEstimate: '$0.02/report', qualityPriority: 'speed' },
   { taskType: 'Image generation', assignedModel: 'Kimi K2.5', fallbackModel: 'GPT-4o', temperature: 0.7, maxTokens: 1024, costEstimate: '$0.03/image', qualityPriority: 'quality' },

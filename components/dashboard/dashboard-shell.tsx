@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { useState } from 'react'
+import { Suspense, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -40,6 +40,8 @@ import { isDemoMode } from '@/lib/demo/mode'
 import { AgentChat } from '@/components/agents/agent-chat'
 import { CommandPalette, useCommandPalette } from '@/components/dashboard/command-palette'
 import { DashboardDemoTour } from '@/components/demo/dashboard-demo-tour'
+import { QuickDemoAutoLoad } from '@/components/demo/quick-demo-auto-load'
+import { QuickDemoStart } from '@/components/demo/quick-demo-start'
 import { dashboardNavGroups, dashboardQuickActions, getPageMeta } from '@/lib/dashboard/nav'
 
 interface DashboardShellProps {
@@ -271,6 +273,15 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
             </Link>
           </Button>
 
+          {demo && (
+            <QuickDemoStart
+              size="sm"
+              variant="outline"
+              label="2-min demo"
+              className="hidden md:flex h-11 rounded-xl border-violet-500/30 bg-violet-500/10 hover:bg-violet-500/20 text-violet-200 shrink-0"
+            />
+          )}
+
           <Button variant="ghost" size="icon" className="relative rounded-lg shrink-0">
             <Bell className="size-4" />
             <span className="absolute top-2 right-2 size-1.5 bg-violet-400 rounded-full ring-2 ring-background" />
@@ -308,6 +319,9 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
         </header>
 
         <main className="flex-1 overflow-auto p-5 lg:p-7">
+          <Suspense fallback={null}>
+            <QuickDemoAutoLoad />
+          </Suspense>
           <DashboardDemoTour />
           {children}
         </main>

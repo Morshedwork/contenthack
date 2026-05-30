@@ -306,7 +306,7 @@ export async function generateLeads(input: {
     model: mc.model,
     fallbackModel: mc.fallbackModel,
     temperature: mc.temperature,
-    maxTokens: mc.maxTokens,
+    maxTokens: Math.max(mc.maxTokens, 4096),
     system: `You are a B2B lead generation researcher. Generate realistic, plausible prospect profiles (these are illustrative examples, not real contact data). Respond only with a valid JSON object.`,
     user: appendCustomPrompt(`${brandContext}
 

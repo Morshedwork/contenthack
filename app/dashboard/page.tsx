@@ -10,6 +10,8 @@ import { CalendarPostCard } from '@/components/calendar/calendar-post-card'
 import { LeadScoreCard } from '@/components/leads/lead-score-card'
 import { PublishLogTable } from '@/components/dashboard/publish-log-table'
 import { OverviewSkeleton } from '@/components/dashboard/overview-skeleton'
+import { QuickDemoStart } from '@/components/demo/quick-demo-start'
+import { isInvestorPitchCampaign } from '@/lib/demo/investor-pitch'
 import { workflowSteps } from '@/lib/demo/data'
 import { useWorkspace } from '@/hooks/use-workspace'
 import {
@@ -78,6 +80,7 @@ export default function OverviewPage() {
   const activeAgents = agents.filter((a) => a.status === 'running' || a.status === 'waiting_for_approval')
   const pendingApprovals = approvalItems.filter((a) => a.status === 'needs_review').length
   const pipelineIndex = getWorkflowActiveIndex(agents)
+  const showQuickDemo = !isInvestorPitchCampaign(campaign.id)
 
   const heroValues = {
     hours: `${roi.weeklyHoursSaved}h`,
@@ -130,12 +133,24 @@ export default function OverviewPage() {
               )}
             </h1>
             <p className="text-base text-muted-foreground mt-3 max-w-xl leading-relaxed">
-              {campaign.campaignGoal || 'Configure your campaign to get started.'}
-              {' '}Agents saved <span className="text-emerald-300 font-medium">{roi.weeklyHoursSaved} hours</span> this week.
+              {isInvestorPitchCampaign(campaign.id) ? (
+                <>
+                  AI agents for content, social media, and sales — research, create, publish, and convert from one dashboard.
+                  {' '}Agents saved <span className="text-emerald-300 font-medium">{roi.weeklyHoursSaved} hours</span> this week.
+                </>
+              ) : (
+                <>
+                  {campaign.campaignGoal || 'Configure your campaign to get started.'}
+                  {' '}Agents saved <span className="text-emerald-300 font-medium">{roi.weeklyHoursSaved} hours</span> this week.
+                </>
+              )}
             </p>
 
             <div className="flex flex-wrap gap-3 mt-5">
-              <Button asChild className="rounded-xl">
+              {showQuickDemo && (
+                <QuickDemoStart size="default" className="rounded-xl" />
+              )}
+              <Button asChild className="rounded-xl" variant={showQuickDemo ? 'outline' : 'default'}>
                 <Link href="/dashboard/chat">
                   <MessageSquare data-icon="inline-start" />
                   Ask AI to run agents
