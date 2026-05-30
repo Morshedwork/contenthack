@@ -1,14 +1,24 @@
 import { redirect } from 'next/navigation'
-import { createClient } from '@/lib/supabase/server'
 import { DashboardShell } from '@/components/dashboard/dashboard-shell'
+import { Toaster } from '@/components/ui/sonner'
+import { createClient } from '@/lib/supabase/server'
+import { isDemoMode, DEMO_USER } from '@/lib/demo/mode'
 
 export default async function DashboardLayout({
   children,
 }: {
   children: React.ReactNode
 }) {
-  const supabase = await createClient()
+  if (isDemoMode()) {
+    return (
+      <DashboardShell user={DEMO_USER}>
+        {children}
+        <Toaster />
+      </DashboardShell>
+    )
+  }
 
+  const supabase = await createClient()
   const {
     data: { user },
     error,
@@ -18,5 +28,10 @@ export default async function DashboardLayout({
     redirect('/auth/login')
   }
 
-  return <DashboardShell user={user}>{children}</DashboardShell>
+  return (
+    <DashboardShell user={user}>
+      {children}
+      <Toaster />
+    </DashboardShell>
+  )
 }

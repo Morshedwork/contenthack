@@ -1,6 +1,5 @@
 'use client'
 
-import { createClient } from '@/lib/supabase/client'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
@@ -19,7 +18,6 @@ export default function SignUpPage() {
 
   const handleSignUp = async (e: React.FormEvent) => {
     e.preventDefault()
-    const supabase = createClient()
     setIsLoading(true)
     setError(null)
 
@@ -36,17 +34,17 @@ export default function SignUpPage() {
     }
 
     try {
-      const { error } = await supabase.auth.signUp({
-        email,
-        password,
-        options: {
-          emailRedirectTo:
-            process.env.NEXT_PUBLIC_DEV_SUPABASE_REDIRECT_URL ??
-            `${window.location.origin}/auth/callback`,
-        },
+      const res = await fetch('/api/auth/sign-up', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email, password }),
       })
-      if (error) throw error
-      router.push('/auth/sign-up-success')
+      const json = await res.json()
+      if (!res.ok || !json.success) {
+        throw new Error(json.error ?? 'Sign up failed')
+      }
+      router.push('/dashboard')
+      router.refresh()
     } catch (error: unknown) {
       setError(error instanceof Error ? error.message : 'An error occurred')
     } finally {
@@ -65,8 +63,7 @@ export default function SignUpPage() {
       {/* Header */}
       <header className="relative z-10 flex items-center justify-between px-6 lg:px-12 py-6">
         <Link href="/" className="flex items-center gap-2 group">
-          <span className="text-xl font-display tracking-tight text-foreground">COMPUTE</span>
-          <span className="text-[10px] font-mono text-muted-foreground mt-0.5">TM</span>
+          <span className="text-xl font-display tracking-tight text-foreground">ContentOps AI</span>
         </Link>
         <Link 
           href="/" 
@@ -79,18 +76,18 @@ export default function SignUpPage() {
 
       {/* Main content */}
       <main className="relative z-10 flex-1 flex items-center justify-center px-6 py-12">
-        <div className="w-full max-w-sm">
-          <div className="text-center mb-8">
-            <h1 className="text-3xl font-display tracking-tight text-foreground mb-2">
+        <div className="w-full max-w-md">
+          <div className="text-center mb-10">
+            <h1 className="text-4xl font-display tracking-tight text-foreground mb-3">
               Create your account
             </h1>
-            <p className="text-sm text-muted-foreground">
-              Deploy your first autonomous AI agent
+            <p className="text-base text-muted-foreground">
+              Start your content operations workspace
             </p>
           </div>
 
-          <div className="bg-card border border-border rounded-lg p-6">
-            <form onSubmit={handleSignUp} className="space-y-4">
+          <div className="bg-card border border-border rounded-2xl p-8">
+            <form onSubmit={handleSignUp} className="space-y-5">
               <div className="space-y-2">
                 <Label htmlFor="email" className="text-sm text-foreground">
                   Email
@@ -158,8 +155,8 @@ export default function SignUpPage() {
               </Button>
             </form>
 
-            <div className="mt-6 pt-6 border-t border-border text-center">
-              <p className="text-sm text-muted-foreground">
+            <div className="mt-7 pt-7 border-t border-border text-center">
+              <p className="text-base text-muted-foreground">
                 Already have an account?{' '}
                 <Link
                   href="/auth/login"
@@ -175,8 +172,8 @@ export default function SignUpPage() {
 
       {/* Footer */}
       <footer className="relative z-10 px-6 lg:px-12 py-6">
-        <p className="text-center text-xs text-muted-foreground">
-          By continuing, you agree to COMPUTE&apos;s Terms of Service and Privacy Policy.
+        <p className="text-center text-sm text-muted-foreground">
+          By continuing, you agree to ContentOps AI&apos;s Terms of Service and Privacy Policy.
         </p>
       </footer>
     </div>

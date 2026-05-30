@@ -1,0 +1,11 @@
+{
+  "mcpServers": {
+    "contentops-ai": {
+      "command": "node",
+      "args": ["scripts/trae-contentops-mcp.mjs"],
+      "env": {
+        "CONTENTOPS_API_URL": "http://localhost:3000"
+      }
+    }
+  }
+}

@@ -1,240 +1,99 @@
-"use client";
+'use client'
 
-import { useState, useEffect } from "react";
-import { Button } from "@/components/ui/button";
-import { Menu, X, Loader2 } from "lucide-react";
-import Link from "next/link";
-import { createClient } from "@/lib/supabase/client";
-import type { User } from "@supabase/supabase-js";
+import Link from 'next/link'
+import { Button } from '@/components/ui/button'
+import { Menu, Sparkles } from 'lucide-react'
+import { useEffect, useState } from 'react'
+import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
+import { cn } from '@/lib/utils'
 
-const navLinks = [
-  { name: "Capabilities",  href: "#features"      },
-  { name: "Process",       href: "#how-it-works"  },
-  { name: "Infra",         href: "#infra"          },
-  { name: "Integrations",  href: "#integrations"  },
-  { name: "Security",      href: "#security"      },
-];
+const links = [
+  { label: 'Features', href: '#features' },
+  { label: 'Workflow', href: '#workflow' },
+  { label: 'Agents', href: '#agents' },
+  { label: 'Live Demo', href: '#demo' },
+  { label: 'Pricing', href: '#pricing' },
+]
 
 export function Navigation() {
-  const [isScrolled, setIsScrolled] = useState(false);
-  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
-  const [user, setUser] = useState<User | null>(null);
-  const [isLoading, setIsLoading] = useState(true);
+  const [open, setOpen] = useState(false)
+  const [scrolled, setScrolled] = useState(false)
 
   useEffect(() => {
-    const handleScroll = () => {
-      setIsScrolled(window.scrollY > 20);
-    };
-    window.addEventListener("scroll", handleScroll);
-    return () => window.removeEventListener("scroll", handleScroll);
-  }, []);
-
-  useEffect(() => {
-    const supabase = createClient();
-    
-    // Get initial session
-    supabase.auth.getUser().then(({ data: { user } }) => {
-      setUser(user);
-      setIsLoading(false);
-    });
-
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setUser(session?.user ?? null);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  const handleSignOut = async () => {
-    const supabase = createClient();
-    await supabase.auth.signOut();
-    setUser(null);
-  };
+    const onScroll = () => setScrolled(window.scrollY > 48)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   return (
     <header
-      className={`fixed z-50 transition-all duration-500 ${
-        isScrolled 
-          ? "top-4 left-4 right-4" 
-          : "top-0 left-0 right-0"
-      }`}
+      className={cn(
+        'fixed top-0 right-0 left-0 z-50 transition-all duration-300',
+        scrolled
+          ? 'border-b border-white/[0.08] bg-black/80 shadow-lg shadow-black/20 backdrop-blur-xl'
+          : 'border-b border-transparent bg-transparent',
+      )}
     >
-      <nav 
-        className={`mx-auto transition-all duration-500 ${
-          isScrolled || isMobileMenuOpen
-            ? "bg-background/80 backdrop-blur-xl border border-foreground/10 rounded-2xl shadow-lg max-w-[1200px]"
-            : "bg-transparent max-w-[1400px]"
-        }`}
-      >
-        <div 
-          className={`flex items-center justify-between transition-all duration-500 px-6 lg:px-8 ${
-            isScrolled ? "h-14" : "h-20"
-          }`}
-        >
-          {/* Logo */}
-          <Link href="/" className="flex items-center gap-2 group">
-            <span className={`font-display tracking-tight transition-all duration-500 ${isScrolled ? "text-xl text-foreground" : "text-2xl text-white"}`}>COMPUTE</span>
-            <span className={`font-mono transition-all duration-500 ${isScrolled ? "text-[10px] mt-0.5 text-muted-foreground" : "text-xs mt-1 text-white/60"}`}>TM</span>
-          </Link>
-
-          {/* Desktop Navigation */}
-          <div className="hidden md:flex items-center gap-12">
-            {navLinks.map((link) => (
-              <a
-                key={link.name}
-                href={link.href}
-                className={`text-sm transition-colors duration-300 relative group ${isScrolled ? "text-foreground/70 hover:text-foreground" : "text-white/70 hover:text-white"}`}
-              >
-                {link.name}
-                <span className={`absolute -bottom-1 left-0 w-0 h-px transition-all duration-300 group-hover:w-full ${isScrolled ? "bg-foreground" : "bg-white"}`} />
-              </a>
-            ))}
+      <div className="mx-auto flex h-[4.25rem] max-w-7xl items-center justify-between px-6 lg:px-12">
+        <Link href="/" className="flex items-center gap-2.5">
+          <div className="flex size-9 items-center justify-center rounded-lg bg-violet-500/20 ring-1 ring-violet-400/30">
+            <Sparkles className="size-5 text-violet-300" />
           </div>
+          <span className="font-display text-xl tracking-tight text-white">ContentOps AI</span>
+        </Link>
 
-          {/* Desktop CTA */}
-          <div className="hidden md:flex items-center gap-4">
-            {isLoading ? (
-              <Loader2 className={`w-4 h-4 animate-spin ${isScrolled ? "text-foreground" : "text-white"}`} />
-            ) : user ? (
-              <>
-                <Link 
-                  href="/dashboard" 
-                  className={`transition-all duration-500 ${isScrolled ? "text-xs text-foreground/70 hover:text-foreground" : "text-sm text-white/70 hover:text-white"}`}
-                >
-                  Dashboard
-                </Link>
-                <Button
-                  size="sm"
-                  variant="outline"
-                  onClick={handleSignOut}
-                  className={`rounded-full transition-all duration-500 ${isScrolled ? "h-8 text-xs px-4" : "px-6"}`}
-                >
-                  Sign out
-                </Button>
-              </>
-            ) : (
-              <>
-                <Link 
-                  href="/auth/login" 
-                  className={`transition-all duration-500 ${isScrolled ? "text-xs text-foreground/70 hover:text-foreground" : "text-sm text-white/70 hover:text-white"}`}
-                >
-                  Sign in
-                </Link>
-                <Button
-                  size="sm"
-                  asChild
-                  className={`rounded-full transition-all duration-500 ${isScrolled ? "bg-foreground hover:bg-foreground/90 text-background px-4 h-8 text-xs" : "bg-white hover:bg-white/90 text-black px-6"}`}
-                >
-                  <Link href="/auth/sign-up">
-                    Deploy agent
-                  </Link>
-                </Button>
-              </>
-            )}
-          </div>
+        <nav className="hidden items-center gap-9 md:flex">
+          {links.map((l) => (
+            <a
+              key={l.href}
+              href={l.href}
+              className="text-base text-white/60 transition-colors hover:text-white"
+            >
+              {l.label}
+            </a>
+          ))}
+        </nav>
 
-          {/* Mobile Menu Button */}
-          <button
-            onClick={() => setIsMobileMenuOpen(!isMobileMenuOpen)}
-            className={`md:hidden p-2 transition-colors duration-500 ${isScrolled || isMobileMenuOpen ? "text-foreground" : "text-white"}`}
-            aria-label="Toggle menu"
+        <div className="hidden items-center gap-3 md:flex">
+          <Button
+            asChild
+            variant="ghost"
+            className="text-base text-white/70 hover:bg-white/10 hover:text-white"
           >
-            {isMobileMenuOpen ? (
-              <X className="w-6 h-6" />
-            ) : (
-              <Menu className="w-6 h-6" />
-            )}
-          </button>
+            <Link href="/auth/login">Sign in</Link>
+          </Button>
+          <Button asChild className="rounded-full shadow-md shadow-violet-500/20">
+            <Link href="/dashboard">Launch Demo</Link>
+          </Button>
         </div>
 
-      </nav>
-      
-      {/* Mobile Menu - Full Screen Overlay */}
-      <div
-        className={`md:hidden fixed inset-0 bg-background z-40 transition-all duration-500 ${
-          isMobileMenuOpen 
-            ? "opacity-100 pointer-events-auto" 
-            : "opacity-0 pointer-events-none"
-        }`}
-        style={{ top: 0 }}
-      >
-        <div className="flex flex-col h-full px-8 pt-28 pb-8">
-          {/* Navigation Links */}
-          <div className="flex-1 flex flex-col justify-center gap-8">
-            {navLinks.map((link, i) => (
-              <a
-                key={link.name}
-                href={link.href}
-                onClick={() => setIsMobileMenuOpen(false)}
-                className={`text-5xl font-display text-foreground hover:text-muted-foreground transition-all duration-500 ${
-                  isMobileMenuOpen 
-                    ? "opacity-100 translate-y-0" 
-                    : "opacity-0 translate-y-4"
-                }`}
-                style={{ transitionDelay: isMobileMenuOpen ? `${i * 75}ms` : "0ms" }}
-              >
-                {link.name}
-              </a>
-            ))}
-          </div>
-          
-          {/* Bottom CTAs */}
-          <div className={`flex gap-4 pt-8 border-t border-foreground/10 transition-all duration-500 ${
-            isMobileMenuOpen 
-              ? "opacity-100 translate-y-0" 
-              : "opacity-0 translate-y-4"
-          }`}
-          style={{ transitionDelay: isMobileMenuOpen ? "300ms" : "0ms" }}
-          >
-            {user ? (
-              <>
-                <Button 
-                  variant="outline" 
-                  className="flex-1 rounded-full h-14 text-base"
-                  onClick={() => {
-                    handleSignOut();
-                    setIsMobileMenuOpen(false);
-                  }}
+        <Sheet open={open} onOpenChange={setOpen}>
+          <SheetTrigger asChild className="md:hidden">
+            <Button variant="ghost" size="icon" className="text-white hover:bg-white/10">
+              <Menu />
+            </Button>
+          </SheetTrigger>
+          <SheetContent className="border-white/10 bg-zinc-950">
+            <SheetTitle className="sr-only">Navigation</SheetTitle>
+            <nav className="mt-8 flex flex-col gap-4">
+              {links.map((l) => (
+                <a
+                  key={l.href}
+                  href={l.href}
+                  onClick={() => setOpen(false)}
+                  className="text-lg text-white"
                 >
-                  Sign out
-                </Button>
-                <Button 
-                  className="flex-1 bg-foreground text-background rounded-full h-14 text-base"
-                  asChild
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <Link href="/dashboard">
-                    Dashboard
-                  </Link>
-                </Button>
-              </>
-            ) : (
-              <>
-                <Button 
-                  variant="outline" 
-                  className="flex-1 rounded-full h-14 text-base"
-                  asChild
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <Link href="/auth/login">
-                    Sign in
-                  </Link>
-                </Button>
-                <Button 
-                  className="flex-1 bg-foreground text-background rounded-full h-14 text-base"
-                  asChild
-                  onClick={() => setIsMobileMenuOpen(false)}
-                >
-                  <Link href="/auth/sign-up">
-                    Deploy agent
-                  </Link>
-                </Button>
-              </>
-            )}
-          </div>
-        </div>
+                  {l.label}
+                </a>
+              ))}
+              <Button asChild className="mt-4 rounded-full">
+                <Link href="/dashboard">Launch Demo</Link>
+              </Button>
+            </nav>
+          </SheetContent>
+        </Sheet>
       </div>
     </header>
-  );
+  )
 }

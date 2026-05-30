@@ -1,227 +1,227 @@
-"use client";
+'use client'
 
-import { useEffect, useRef, useState } from "react";
+import { motion } from 'framer-motion'
+import { Bot, Calendar, Cpu, LineChart, Megaphone, Search, Shield, Users, Video } from 'lucide-react'
+import { DashboardPreview } from './dashboard-preview'
+import { GlassCard, IconBadge, SectionHeader, SectionShell } from './landing-ui'
 
 const features = [
-  {
-    number: "01",
-    title: "Autonomous Execution",
-    description: "Deploy AI agents that work independently. They analyze, decide, and execute complex multi-step tasks without human intervention.",
-    stats: { value: "99.7%", label: "task completion" },
-  },
-  {
-    number: "02",
-    title: "Distributed Computing",
-    description: "Offload compute-heavy tasks to our global network. Your agents run on optimized infrastructure across 50+ regions worldwide.",
-    stats: { value: "50+", label: "global regions" },
-  },
-  {
-    number: "03",
-    title: "Multi-Agent Orchestration",
-    description: "Coordinate teams of specialized agents. They communicate, delegate, and collaborate to solve complex problems together.",
-    stats: { value: "1000x", label: "parallel execution" },
-  },
-  {
-    number: "04",
-    title: "Secure Sandboxing",
-    description: "Each agent runs in isolated environments. Full audit trails, encrypted execution, and zero data leakage between tasks.",
-    stats: { value: "0", label: "data breaches" },
-  },
-];
-
-// Floating dot particles visualization
-function ParticleVisualization() {
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const frameRef = useRef(0);
-  const mouseRef = useRef({ x: 0.5, y: 0.5 });
-
-  useEffect(() => {
-    const canvas = canvasRef.current;
-    if (!canvas) return;
-    const ctx = canvas.getContext("2d");
-    if (!ctx) return;
-
-    const resize = () => {
-      const rect = canvas.getBoundingClientRect();
-      const dpr = Math.min(window.devicePixelRatio || 1, 2);
-      canvas.width = rect.width * dpr;
-      canvas.height = rect.height * dpr;
-      ctx.scale(dpr, dpr);
-    };
-    resize();
-    window.addEventListener("resize", resize);
-
-    const handleMouseMove = (e: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      mouseRef.current = {
-        x: (e.clientX - rect.left) / rect.width,
-        y: (e.clientY - rect.top) / rect.height,
-      };
-    };
-    canvas.addEventListener("mousemove", handleMouseMove);
-
-    // Generate stable particle positions
-    const COUNT = 70;
-    const particles = Array.from({ length: COUNT }, (_, i) => {
-      const seed = i * 1.618;
-      return {
-        bx: ((seed * 127.1) % 1),
-        by: ((seed * 311.7) % 1),
-        phase: seed * Math.PI * 2,
-        speed: 0.4 + (seed % 0.4),
-        radius: 1.2 + (seed % 2.2),
-      };
-    });
-
-    let time = 0;
-    const render = () => {
-      const rect = canvas.getBoundingClientRect();
-      const w = rect.width;
-      const h = rect.height;
-
-      ctx.clearRect(0, 0, w, h);
-
-      const mx = mouseRef.current.x;
-      const my = mouseRef.current.y;
-
-      particles.forEach((p) => {
-        const flowX = Math.sin(time * p.speed * 0.4 + p.phase) * 38;
-        const flowY = Math.cos(time * p.speed * 0.3 + p.phase * 0.7) * 24;
-
-        const bx = p.bx * w;
-        const by = p.by * h;
-        const dx = p.bx - mx;
-        const dy = p.by - my;
-        const dist = Math.sqrt(dx * dx + dy * dy);
-        const influence = Math.max(0, 1 - dist * 2.8);
-
-        const x = bx + flowX + influence * Math.cos(time + p.phase) * 36;
-        const y = by + flowY + influence * Math.sin(time + p.phase) * 36;
-
-        const pulse = Math.sin(time * p.speed + p.phase) * 0.5 + 0.5;
-        const alpha = 0.08 + pulse * 0.18 + influence * 0.3;
-
-        ctx.beginPath();
-        ctx.arc(x, y, p.radius + pulse * 0.8, 0, Math.PI * 2);
-        ctx.fillStyle = `rgba(255, 255, 255, ${alpha})`;
-        ctx.fill();
-      });
-
-      time += 0.016;
-      frameRef.current = requestAnimationFrame(render);
-    };
-    render();
-
-    return () => {
-      window.removeEventListener("resize", resize);
-      canvas.removeEventListener("mousemove", handleMouseMove);
-      cancelAnimationFrame(frameRef.current);
-    };
-  }, []);
-
-  return (
-    <canvas
-      ref={canvasRef}
-      className="absolute inset-0 pointer-events-auto"
-      style={{ width: "100%", height: "100%" }}
-    />
-  );
-}
+  { icon: Search, title: 'From campaign goal to content calendar', desc: 'Guided campaign builder generates research, topics, posts, and schedules automatically.' },
+  { icon: Bot, title: 'Multi agent workflow automation', desc: '10 specialized agents handle research, content, video, safety, publishing, and outreach.' },
+  { icon: Cpu, title: 'Model routing for every task', desc: 'Route the right OpenAI model (GPT-4o, GPT-4.1, o4-mini) to each task with fallback and cost controls.' },
+  { icon: Users, title: 'Lead generation from content strategy', desc: 'Find qualified leads based on content topics, engagement signals, and audience fit.' },
+  { icon: Megaphone, title: 'Publishing center with approval control', desc: 'Mock or live publishing to LinkedIn, Instagram, Facebook, X, TikTok, and YouTube Shorts.' },
+  { icon: LineChart, title: 'ROI analytics for productivity teams', desc: 'Measure hours saved, cost reduction, content output, and campaign execution speed.' },
+]
 
 export function FeaturesSection() {
-  const [isVisible, setIsVisible] = useState(false);
-  const [activeFeature, setActiveFeature] = useState(0);
-  const sectionRef = useRef<HTMLDivElement>(null);
+  return (
+    <SectionShell id="features" variant="glow">
+      <SectionHeader
+        eyebrow="Platform"
+        title="Everything your content ops team needs"
+        description="Not a chatbot — a complete visual command center for marketing and sales teams."
+      />
+      <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+        {features.map((f, i) => (
+          <motion.div
+            key={f.title}
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            transition={{ delay: i * 0.06 }}
+            viewport={{ once: true }}
+          >
+            <GlassCard hover className="h-full">
+              <IconBadge tone="violet">
+                <f.icon className="size-5" />
+              </IconBadge>
+              <h3 className="mb-2 font-medium text-white">{f.title}</h3>
+              <p className="text-sm leading-relaxed text-white/50">{f.desc}</p>
+            </GlassCard>
+          </motion.div>
+        ))}
+      </div>
+    </SectionShell>
+  )
+}
 
-  useEffect(() => {
-    const observer = new IntersectionObserver(
-      ([entry]) => {
-        if (entry.isIntersecting) setIsVisible(true);
-      },
-      { threshold: 0.1 }
-    );
-
-    if (sectionRef.current) observer.observe(sectionRef.current);
-    return () => observer.disconnect();
-  }, []);
+export function MultiAgentSection() {
+  const agents = [
+    'Research Agent', 'Strategy Agent', 'Content Agent', 'Video Agent', 'Brand Safety Agent',
+    'Scheduler Agent', 'Publisher Agent', 'Lead Finder Agent', 'Outreach Agent', 'Analytics Agent',
+  ]
 
   return (
-    <section
-      id="features"
-      ref={sectionRef}
-      className="relative py-24 lg:py-32 overflow-hidden"
-    >
-      <div className="max-w-[1400px] mx-auto px-6 lg:px-12">
-        {/* Header - Full width with diagonal layout */}
-        <div className="relative mb-24 lg:mb-32">
-          <div className="grid lg:grid-cols-12 gap-8 items-end">
-            <div className="lg:col-span-7">
-              <span className="inline-flex items-center gap-3 text-sm font-mono text-muted-foreground mb-6">
-                <span className="w-12 h-px bg-foreground/30" />
-                Capabilities
-              </span>
-              <h2
-                className={`text-6xl md:text-7xl lg:text-[128px] font-display tracking-tight leading-[0.9] transition-all duration-1000 ${
-                  isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-8"
-                }`}
-              >
-                Intelligent
-                <br />
-                <span className="text-muted-foreground">workers.</span>
-              </h2>
-            </div>
-            <div className="lg:col-span-5 lg:pb-4">
-              <p className={`text-xl text-muted-foreground leading-relaxed transition-all duration-1000 delay-200 ${
-                isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-4"
-              }`}>
-                Deploy autonomous AI agents that execute complex tasks across distributed infrastructure. No supervision required.
-              </p>
-            </div>
-          </div>
-        </div>
-
-        {/* Bento Grid Layout */}
-        <div className="grid lg:grid-cols-12 gap-4 lg:gap-6">
-          {/* Large feature card */}
-          <div 
-            className={`lg:col-span-12 relative bg-black border border-foreground/10 min-h-[500px] overflow-hidden group transition-all duration-700 flex ${
-              isVisible ? "opacity-100 translate-y-0" : "opacity-0 translate-y-12"
-            }`}
-            onMouseEnter={() => setActiveFeature(0)}
+    <SectionShell id="agents" variant="elevated">
+      <SectionHeader
+        eyebrow="Agents"
+        title="Multi agent system"
+        description="Each agent has a role, assigned model, progress tracking, and confidence scoring."
+      />
+      <div className="grid grid-cols-2 gap-3 md:grid-cols-3 lg:grid-cols-5">
+        {agents.map((agent, i) => (
+          <motion.div
+            key={agent}
+            initial={{ opacity: 0, scale: 0.96 }}
+            whileInView={{ opacity: 1, scale: 1 }}
+            transition={{ delay: i * 0.04 }}
+            viewport={{ once: true }}
           >
-            {/* Left: text content */}
-            <div className="relative flex-1 p-8 lg:p-12 bg-black">
-              <ParticleVisualization />
-              <div className="relative z-10">
-                <span className="font-mono text-sm text-muted-foreground">{features[0].number}</span>
-                <h3 className="text-3xl lg:text-4xl font-display mt-4 mb-6 group-hover:translate-x-2 transition-transform duration-500">
-                  {features[0].title}
-                </h3>
-                <p className="text-lg text-muted-foreground leading-relaxed max-w-md mb-8">
-                  {features[0].description}
-                </p>
-                <div>
-                  <span className="text-5xl lg:text-6xl font-display">{features[0].stats.value}</span>
-                  <span className="block text-sm text-muted-foreground font-mono mt-2">{features[0].stats.label}</span>
-                </div>
-              </div>
-            </div>
-
-            {/* Right: mirrored image, full height */}
-            <div className="hidden lg:block relative w-[42%] shrink-0 overflow-hidden">
-              <img
-                src="https://hebbkx1anhila5yf.public.blob.vercel-storage.com/Upscaled%20Image%20%2812%29-ng3RrNnsPMJ5CrtOjcPTmhHg01W11q.png"
-                alt=""
-                aria-hidden="true"
-                className="absolute inset-0 w-full h-full object-cover object-center"
-                style={{ transform: "scaleX(-1)" }}
-              />
-              {/* Fade left edge into black */}
-              <div className="absolute inset-0 bg-gradient-to-r from-black via-transparent to-transparent" />
-            </div>
-          </div>
-        </div>
+            <GlassCard className="p-4 text-center">
+              <Bot className="mx-auto mb-2 size-5 text-violet-300" />
+              <p className="text-xs font-medium text-white">{agent}</p>
+              <p className="mt-1 text-[10px] text-white/40">
+                {['Running', 'Completed', 'Idle', 'Running', 'Waiting'][i % 5]}
+              </p>
+            </GlassCard>
+          </motion.div>
+        ))}
       </div>
-    </section>
-  );
+    </SectionShell>
+  )
+}
+
+export function ModelManagementSection() {
+  const models = [
+    { name: 'GPT-4o', provider: 'OpenAI', score: 92 },
+    { name: 'GPT-4.1', provider: 'OpenAI', score: 94 },
+    { name: 'GPT-4o mini', provider: 'OpenAI', score: 87 },
+    { name: 'GPT-4.1 mini', provider: 'OpenAI', score: 89 },
+    { name: 'o4-mini', provider: 'OpenAI', score: 91 },
+    { name: 'Mock Model', provider: 'Demo', score: 80 },
+  ]
+
+  return (
+    <SectionShell>
+      <SectionHeader
+        eyebrow="Models"
+        title="Model management"
+        description="Route the right model to each task with cost, speed, and quality controls."
+      />
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-3">
+        {models.map((m) => (
+          <GlassCard key={m.name} className="p-5">
+            <div className="mb-3 flex items-center gap-2">
+              <Cpu className="size-4 text-violet-300" />
+              <span className="text-sm font-medium text-white">{m.name}</span>
+            </div>
+            <p className="mb-2 text-xs text-white/45">{m.provider}</p>
+            <div className="flex items-center justify-between">
+              <span className="text-xs text-white/40">Quality</span>
+              <span className="text-sm font-medium text-emerald-400">{m.score}/100</span>
+            </div>
+          </GlassCard>
+        ))}
+      </div>
+    </SectionShell>
+  )
+}
+
+export function ROISection() {
+  const metrics = [
+    { label: 'Research time', before: '6 hrs/wk', after: '45 min/wk' },
+    { label: 'Lead research', before: '2 hrs/wk', after: '25 min/wk' },
+    { label: 'Manual posting', before: '100%', after: '-80%' },
+    { label: 'Planning speed', before: 'Baseline', after: '+70%' },
+  ]
+
+  return (
+    <SectionShell variant="elevated">
+      <SectionHeader
+        eyebrow="Impact"
+        title="Productivity ROI"
+        description="Real impact numbers from teams using ContentOps AI."
+      />
+      <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
+        {metrics.map((m) => (
+          <GlassCard key={m.label} className="p-5 text-center">
+            <p className="mb-3 text-xs text-white/45">{m.label}</p>
+            <p className="mb-1 text-sm text-red-400/70 line-through">{m.before}</p>
+            <p className="font-display text-xl text-emerald-400 md:text-2xl">{m.after}</p>
+          </GlassCard>
+        ))}
+      </div>
+    </SectionShell>
+  )
+}
+
+export function SocialAutomationSection() {
+  const platforms = ['LinkedIn', 'Instagram', 'Facebook', 'X', 'TikTok', 'YouTube Shorts']
+  return (
+    <SectionShell>
+      <SectionHeader
+        eyebrow="Publishing"
+        title="Social media automation"
+        description="Official API-ready adapters with mock mode for demos. No content publishes without approval."
+      />
+      <div className="flex flex-wrap justify-center gap-3">
+        {platforms.map((p) => (
+          <div
+            key={p}
+            className="flex items-center gap-2 rounded-full border border-white/10 bg-white/[0.04] px-5 py-2.5 text-sm text-white/80 backdrop-blur-sm"
+          >
+            <Megaphone className="size-4 text-violet-300" />
+            {p}
+          </div>
+        ))}
+      </div>
+    </SectionShell>
+  )
+}
+
+export function LeadGenSection() {
+  return (
+    <SectionShell variant="elevated">
+      <div className="grid items-start gap-12 md:grid-cols-2">
+        <div>
+          <SectionHeader
+            align="left"
+            eyebrow="Leads"
+            title="Lead generation center"
+            description="Discover qualified leads from content strategy and engagement signals. Personalized outreach with mandatory approval before sending."
+            className="mb-8"
+          />
+          <ul className="flex flex-col gap-3">
+            {['Lead scoring & pipeline tracking', 'Personalized outreach drafts', 'Platform-specific match reasons', 'Suggested next actions'].map((item) => (
+              <li key={item} className="flex items-center gap-2 text-sm text-white/60">
+                <Shield className="size-4 shrink-0 text-emerald-400" />
+                {item}
+              </li>
+            ))}
+          </ul>
+        </div>
+        <GlassCard>
+          {[
+            { name: 'Yuki Tanaka', company: 'TechFlow Tokyo', score: 94 },
+            { name: 'James Okonkwo', company: 'AfriTech Solutions', score: 91 },
+            { name: 'Kenji Watanabe', company: 'RoboWorks JP', score: 93 },
+          ].map((lead) => (
+            <div
+              key={lead.name}
+              className="flex items-center justify-between border-b border-white/10 py-3 last:border-0"
+            >
+              <div>
+                <p className="text-sm font-medium text-white">{lead.name}</p>
+                <p className="text-xs text-white/45">{lead.company}</p>
+              </div>
+              <span className="font-display text-lg text-emerald-400">{lead.score}</span>
+            </div>
+          ))}
+        </GlassCard>
+      </div>
+    </SectionShell>
+  )
+}
+
+export function DemoPreviewSection() {
+  return (
+    <SectionShell id="demo" variant="glow">
+      <SectionHeader
+        eyebrow="Live demo"
+        title="See the command center in action"
+        description="A fully interactive demo dashboard with realistic Cognisor AI campaign data — agents, workflow, calendar, and leads in one view."
+      />
+      <DashboardPreview />
+    </SectionShell>
+  )
 }
