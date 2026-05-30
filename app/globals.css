@@ -383,6 +383,71 @@
     }
   }
 
+  /* Smooth page / panel entrance */
+  .content-enter {
+    animation: content-enter 0.45s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @keyframes content-enter {
+    from {
+      opacity: 0;
+      transform: translateY(8px);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+
+  .message-enter {
+    animation: message-enter 0.35s cubic-bezier(0.22, 1, 0.36, 1) both;
+  }
+
+  @keyframes message-enter {
+    from {
+      opacity: 0;
+      transform: translateY(6px) scale(0.98);
+    }
+    to {
+      opacity: 1;
+      transform: translateY(0) scale(1);
+    }
+  }
+
+  .skeleton-shimmer {
+    background: linear-gradient(
+      90deg,
+      oklch(0.22 0.02 286 / 0.5) 0%,
+      oklch(0.28 0.03 290 / 0.75) 50%,
+      oklch(0.22 0.02 286 / 0.5) 100%
+    );
+    background-size: 200% 100%;
+    animation: skeleton-shimmer 1.4s ease-in-out infinite;
+  }
+
+  @keyframes skeleton-shimmer {
+    0% { background-position: 100% 0; }
+    100% { background-position: -100% 0; }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .content-enter,
+    .message-enter {
+      animation: none;
+    }
+    .skeleton-shimmer {
+      animation: none;
+    }
+    .dash-card,
+    .dash-card-interactive,
+    .glass-panel {
+      transition: none;
+    }
+    .status-live::after {
+      animation: none;
+    }
+  }
+
   /* Interactive dashboard card */
   .dash-card {
     background: linear-gradient(155deg, oklch(0.19 0.028 286 / 0.75), oklch(0.11 0.018 280 / 0.65));
@@ -390,7 +455,10 @@
     border: 1px solid oklch(0.45 0.05 290 / 0.14);
     border-radius: var(--radius-xl);
     box-shadow: 0 1px 0 0 oklch(1 0 0 / 0.04) inset;
-    transition: border-color 0.25s ease, transform 0.25s ease, box-shadow 0.25s ease;
+    transition:
+      border-color 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+      transform 0.35s cubic-bezier(0.22, 1, 0.36, 1),
+      box-shadow 0.35s cubic-bezier(0.22, 1, 0.36, 1);
   }
 
   .dash-card:hover {
@@ -399,7 +467,7 @@
   }
 
   .dash-card-interactive:hover {
-    transform: translateY(-2px);
+    transform: translateY(-3px);
   }
 
   /* Live status pulse */

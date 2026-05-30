@@ -100,7 +100,7 @@ function ChatModeToggle({
         disabled={disabled}
         onClick={() => onChange('basic')}
         className={cn(
-          'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50',
+          'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-300 ease-out disabled:opacity-50',
           mode === 'basic'
             ? 'bg-background text-foreground shadow-sm'
             : 'text-muted-foreground hover:text-foreground',
@@ -114,7 +114,7 @@ function ChatModeToggle({
         disabled={disabled}
         onClick={() => onChange('agent')}
         className={cn(
-          'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-colors disabled:opacity-50',
+          'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium transition-all duration-300 ease-out disabled:opacity-50',
           mode === 'agent'
             ? 'bg-background text-foreground shadow-sm'
             : 'text-muted-foreground hover:text-foreground',
@@ -235,7 +235,7 @@ export function AgentChat({ variant = 'page', className }: AgentChatProps) {
               type="button"
               onClick={() => void sendMessage(prompt)}
               disabled={loading}
-              className="rounded-full border border-border/60 bg-secondary/30 px-3 py-1.5 text-xs text-muted-foreground transition-colors hover:bg-violet-500/10 hover:text-foreground hover:border-violet-500/30 disabled:opacity-50"
+              className="rounded-full border border-border/60 bg-secondary/30 px-3 py-1.5 text-xs text-muted-foreground transition-all duration-300 ease-out hover:bg-violet-500/10 hover:text-foreground hover:border-violet-500/30 disabled:opacity-50"
             >
               {prompt}
             </button>
@@ -253,8 +253,12 @@ export function AgentChat({ variant = 'page', className }: AgentChatProps) {
           <div ref={scrollRef} className="p-4 space-y-4">
             {messages.map((msg, i) => (
               <div
-                key={i}
-                className={cn('flex gap-3', msg.role === 'user' ? 'flex-row-reverse' : 'flex-row')}
+                key={`${msg.role}-${i}-${msg.content.slice(0, 32)}`}
+                className={cn(
+                  'flex gap-3',
+                  msg.role === 'user' ? 'flex-row-reverse' : 'flex-row',
+                  i === messages.length - 1 && 'message-enter',
+                )}
               >
                 <div
                   className={cn(
@@ -294,7 +298,7 @@ export function AgentChat({ variant = 'page', className }: AgentChatProps) {
             ))}
 
             {loading && (
-              <div className="flex gap-3">
+              <div className="flex gap-3 message-enter">
                 <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-violet-500/15 border border-violet-500/20">
                   <Bot className="size-4 text-violet-300" />
                 </div>

@@ -43,6 +43,7 @@ import { DashboardDemoTour } from '@/components/demo/dashboard-demo-tour'
 import { QuickDemoAutoLoad } from '@/components/demo/quick-demo-auto-load'
 import { QuickDemoStart } from '@/components/demo/quick-demo-start'
 import { dashboardNavGroups, dashboardQuickActions, getPageMeta } from '@/lib/dashboard/nav'
+import { WorkspaceProvider } from '@/components/dashboard/workspace-provider'
 
 interface DashboardShellProps {
   user: { email?: string; user_metadata?: { full_name?: string } }
@@ -192,6 +193,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
   )
 
   return (
+    <WorkspaceProvider>
     <div className="min-h-screen flex dashboard-mesh">
       <CommandPalette open={cmdOpen} onOpenChange={setCmdOpen} />
 
@@ -323,7 +325,9 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
             <QuickDemoAutoLoad />
           </Suspense>
           <DashboardDemoTour />
-          {children}
+          <div key={pathname} className="content-enter max-w-[1600px] mx-auto w-full">
+            {children}
+          </div>
         </main>
       </div>
 
@@ -332,7 +336,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
           <SheetTrigger asChild>
             <Button
               size="lg"
-              className="fixed bottom-5 right-5 z-50 size-12 rounded-2xl shadow-xl shadow-violet-500/30 bg-gradient-to-br from-violet-500 to-blue-500 hover:from-violet-600 hover:to-blue-600 p-0 border border-white/10"
+              className="fixed bottom-5 right-5 z-50 size-12 rounded-2xl shadow-xl shadow-violet-500/30 bg-gradient-to-br from-violet-500 to-blue-500 hover:from-violet-600 hover:to-blue-600 hover:scale-105 active:scale-95 p-0 border border-white/10 transition-transform duration-300 ease-out"
               aria-label="Open AI Chat"
             >
               <MessageSquare className="size-5 text-white" />
@@ -356,5 +360,6 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
         </Sheet>
       )}
     </div>
+    </WorkspaceProvider>
   )
 }

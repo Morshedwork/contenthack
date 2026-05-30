@@ -93,7 +93,7 @@ export default function OverviewPage() {
   const secondaryKPIs = overviewKPIs.slice(4)
 
   return (
-    <div className="flex flex-col gap-6 max-w-[1600px] mx-auto">
+    <div className="flex flex-col gap-6 content-enter">
       {/* Hero */}
       <section className="relative overflow-hidden rounded-2xl dash-card p-6 md:p-8">
         <div className="absolute inset-0 dot-grid opacity-40 pointer-events-none" />
