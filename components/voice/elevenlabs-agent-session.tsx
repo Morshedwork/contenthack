@@ -29,7 +29,7 @@ interface ElevenLabsAgentSessionProps {
   className?: string
   compact?: boolean
   embed?: boolean
-  orbSize?: 'sm' | 'lg' | 'xl'
+  orbSize?: 'sm' | 'md' | 'lg' | 'xl'
   showEndButton?: boolean
 }
 

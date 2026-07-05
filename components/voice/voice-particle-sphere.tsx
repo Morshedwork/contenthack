@@ -9,7 +9,7 @@ import type { VoiceFlowState } from '@/components/voice/voice-flow-orb'
 interface VoiceParticleSphereProps {
   state: VoiceFlowState
   onClick?: () => void
-  size?: 'sm' | 'lg' | 'xl'
+  size?: 'sm' | 'md' | 'lg' | 'xl'
   className?: string
   label?: string
 }
@@ -37,8 +37,8 @@ const SPEED: Record<VoiceFlowState, number> = {
   executing: 1.75,
 }
 
-const DIM = { sm: 148, lg: 240, xl: 320 } as const
-const CORE = { sm: 80, lg: 132, xl: 176 } as const
+const DIM = { sm: 148, md: 200, lg: 240, xl: 300 } as const
+const CORE = { sm: 80, md: 110, lg: 132, xl: 168 } as const
 
 function buildSphere(count: number, radius: number): Point3D[] {
   const phi = Math.PI * (3 - Math.sqrt(5))
@@ -88,7 +88,7 @@ export function VoiceParticleSphere({
     canvas.style.height = `${h}px`
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0)
 
-    const count = size === 'xl' ? 920 : size === 'lg' ? 720 : 420
+    const count = size === 'xl' ? 880 : size === 'lg' ? 720 : size === 'md' ? 560 : 420
     const radius = core * 0.46
     const points = buildSphere(count, radius)
 

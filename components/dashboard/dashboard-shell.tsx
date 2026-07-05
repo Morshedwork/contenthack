@@ -66,8 +66,8 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
   const displayName = user.user_metadata?.full_name || user.email || 'Demo User'
   const initial = displayName[0]?.toUpperCase() ?? 'D'
   const pageMeta = getPageMeta(pathname)
-  const isAssistantPage =
-    pathname === '/dashboard/chat' || pathname === '/dashboard/voice'
+  const isChatPage = pathname === '/dashboard/chat'
+  const isFullHeightPage = isChatPage
 
   const handleSignOut = async () => {
     if (demo) {
@@ -378,7 +378,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
         <main
           className={cn(
             'flex-1',
-            isAssistantPage
+            isFullHeightPage
               ? 'flex min-h-0 flex-col overflow-hidden p-3 sm:p-4 lg:p-5'
               : 'overflow-auto p-5 lg:p-7',
           )}
@@ -390,7 +390,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
           <div
             className={cn(
               'content-enter mx-auto w-full',
-              isAssistantPage
+              isFullHeightPage
                 ? 'flex min-h-0 flex-1 flex-col'
                 : 'max-w-[1600px]',
             )}
@@ -400,7 +400,7 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
         </main>
       </div>
 
-      {!isAssistantPage && (
+      {!isChatPage && (
         <Sheet open={chatOpen} onOpenChange={setChatOpen}>
           <SheetTrigger asChild>
             <Button

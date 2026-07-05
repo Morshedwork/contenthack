@@ -48,8 +48,9 @@ export function VoiceGlassSession({
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.5, ease: [0.22, 1, 0.36, 1] }}
       className={cn(
-        'relative w-full max-w-lg overflow-hidden rounded-[1.35rem]',
-        'border border-sky-300/15 bg-white/[0.07] shadow-[0_24px_80px_-24px_rgba(37,99,235,0.45)] backdrop-blur-[20px]',
+        'relative w-full overflow-hidden rounded-[1.35rem]',
+        'border border-sky-300/15 bg-white/[0.07] shadow-[0_20px_60px_-24px_rgba(37,99,235,0.4)] backdrop-blur-[20px]',
+        'min-h-[12.5rem] lg:min-h-[16rem]',
         className,
       )}
     >
@@ -76,7 +77,7 @@ export function VoiceGlassSession({
         </button>
       ) : null}
 
-      <div className="relative z-10 flex flex-col gap-4 px-5 pb-5 pt-6 sm:px-6 sm:pb-6 sm:pt-7">
+      <div className="relative z-10 flex flex-1 flex-col justify-center gap-4 px-5 pb-5 pt-5 sm:gap-5 sm:px-6 sm:pb-6 sm:pt-6">
         <AnimatePresence mode="wait">
           <motion.p
             key={displayText.slice(0, 48)}
@@ -107,7 +108,7 @@ export function VoiceGlassSession({
           </motion.p>
         </AnimatePresence>
 
-        <VoiceSineWaveform mode={WAVEFORM_MODE[flowState]} height={80} className="mx-auto max-w-md" />
+        <VoiceSineWaveform mode={WAVEFORM_MODE[flowState]} height={88} className="mx-auto w-full max-w-none" />
 
         {micControl ? <div className="flex justify-center pt-1">{micControl}</div> : null}
       </div>
