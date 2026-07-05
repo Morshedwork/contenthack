@@ -18,7 +18,13 @@ export {
   POLLINATIONS_RENDER_MODELS,
   OPENAI_RENDER_MODELS,
   IMAGE_ASPECT_RATIOS,
-  VIDEO_MODELS,
+  OPENROUTER_RENDER_MODELS,
+  OPENROUTER_VIDEO_MODELS,
+  OPENROUTER_IMAGE_QUALITY_OPTIONS,
+  OPENROUTER_IMAGE_RESOLUTION_OPTIONS,
+  OPENROUTER_VIDEO_RESOLUTIONS,
+  OPENROUTER_VIDEO_DURATIONS,
+  PIXVERSE_VIDEO_MODELS,
   VIDEO_DURATIONS,
   VIDEO_QUALITIES,
   VIDEO_ASPECT_RATIOS,
@@ -33,7 +39,11 @@ export {
   type GptImageQualityId,
   type GptImage2ResolutionId,
   type GptImage2ThinkingId,
+  type OpenRouterImageQualityId,
+  type OpenRouterImageResolutionId,
+  type OpenRouterVideoModelId,
   type VideoDurationSec,
+  type VideoProvider,
 } from './media-options'
 
 export function getModels(): AIModel[] {

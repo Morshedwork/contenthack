@@ -5,9 +5,22 @@ import { hasTextAI } from '@/lib/ai/layer'
 import { hasKimi } from '@/lib/ai/kimi'
 import { hasOpenAI } from '@/lib/ai/openai'
 import { hasOpenAIImage, normalizeOpenAIImageModel, OPENAI_IMAGE_MODEL } from '@/lib/ai/openai-image'
+import { hasOpenRouter } from '@/lib/ai/openrouter'
 import { hasPixverse, type PixverseModel } from '@/lib/ai/pixverse'
+import {
+  defaultOpenRouterGenerateAudio,
+  defaultOpenRouterVideoResolution,
+  defaultVideoLayerMode,
+  videoLayerSummary,
+} from '@/lib/env/video-layer'
 import { isDemoMode } from '@/lib/demo/mode'
-import type { ImagePromptModelId, ImageRenderModelId } from '@/lib/models/media-options'
+import type {
+  ImagePromptModelId,
+  ImageRenderModelId,
+  OpenRouterRenderModelId,
+  OpenRouterVideoModelId,
+  VideoProvider,
+} from '@/lib/models/media-options'
 import { hasSupabaseConfig } from '@/lib/supabase/env'
 import { hasSupabasePersistence } from '@/lib/workspace/persistence'
 
@@ -19,6 +32,7 @@ export interface AppProviders {
   crustdata: boolean
   brightdata: boolean
   pixverse: boolean
+  openrouter: boolean
   elevenlabs: boolean
   supabase: boolean
   supabasePersistence: boolean
@@ -35,6 +49,7 @@ export function getAppProviders(): AppProviders {
     crustdata: hasCrustdata(),
     brightdata: hasBrightData(),
     pixverse: hasPixverse(),
+    openrouter: hasOpenRouter(),
     elevenlabs: hasElevenLabs(),
     supabase: hasSupabaseConfig(),
     supabasePersistence: hasSupabasePersistence(),
@@ -51,15 +66,32 @@ export function defaultImagePromptModel(): ImagePromptModelId {
 }
 
 export function defaultImageRenderModel(): ImageRenderModelId {
+  if (hasOpenRouter()) {
+    const env = process.env.OPENROUTER_IMAGE_MODEL?.trim()
+    if (env) return env as ImageRenderModelId
+    return 'bytedance-seed/seedream-4.5' as OpenRouterRenderModelId
+  }
   if (hasOpenAIImage()) {
     return normalizeOpenAIImageModel(process.env.OPENAI_IMAGE_MODEL?.trim() || OPENAI_IMAGE_MODEL) as ImageRenderModelId
   }
   return 'flux'
 }
 
-export function defaultVideoModel(): PixverseModel {
-  return (process.env.PIXVERSE_MODEL?.trim() || 'v4.5') as PixverseModel
+export function defaultVideoProvider(): VideoProvider {
+  return defaultVideoLayerMode()
 }
+
+export function defaultVideoModel(): PixverseModel {
+  return (process.env.PIXVERSE_MODEL?.trim() || 'v6') as PixverseModel
+}
+
+export function defaultOpenRouterVideoModel(): OpenRouterVideoModelId {
+  const env = process.env.OPENROUTER_VIDEO_MODEL?.trim()
+  if (env) return env as OpenRouterVideoModelId
+  return 'openai/sora-2-pro'
+}
+
+export { defaultOpenRouterVideoResolution, defaultOpenRouterGenerateAudio, videoLayerSummary }
 
 export function configuredEnvVarNames(): string[] {
   const names = [
@@ -68,6 +100,7 @@ export function configuredEnvVarNames(): string[] {
     'CRUSTDATA_API_KEY',
     'KIMI_API_KEY',
     'PIXVERSE_API_KEY',
+    'OPENROUTER_API_KEY',
     'ELEVENLABS_API_KEY',
     'SUPABASE_SERVICE_ROLE_KEY',
     'NEXT_PUBLIC_SUPABASE_URL',

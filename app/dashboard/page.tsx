@@ -387,7 +387,7 @@ export default function OverviewPage() {
               <Link href="/dashboard/leads">View all</Link>
             </Button>
           </div>
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div className="grid min-w-0 grid-cols-1 gap-4 sm:grid-cols-2">
             {leads.filter((l) => l.score >= 85).slice(0, 4).map((lead) => (
               <LeadScoreCard key={lead.id} lead={lead} />
             ))}
@@ -404,20 +404,20 @@ export default function OverviewPage() {
               Recent Activity
             </h2>
           </div>
-          <div className="flex flex-col gap-0 divide-y divide-border/30">
+          <div className="flex min-w-0 flex-col gap-0 divide-y divide-border/30">
             {tasks.slice(0, 5).map((task) => (
-              <div key={task.id} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
+              <div key={task.id} className="flex min-w-0 items-center gap-3 py-3 first:pt-0 last:pb-0">
                 <div className={cn(
-                  'size-2 rounded-full shrink-0',
+                  'size-2 shrink-0 rounded-full',
                   task.status === 'completed' ? 'bg-emerald-400' :
                   task.status === 'running' ? 'bg-violet-400 animate-pulse' :
                   task.status === 'waiting_for_approval' ? 'bg-amber-400' : 'bg-muted-foreground/40',
                 )} />
                 <div className="min-w-0 flex-1">
-                  <p className="text-sm font-medium truncate">{task.name}</p>
-                  <p className="text-xs text-muted-foreground mt-0.5">{task.assignedAgent}</p>
+                  <p className="truncate text-sm font-medium">{task.name}</p>
+                  <p className="mt-0.5 truncate text-xs text-muted-foreground">{task.assignedAgent}</p>
                 </div>
-                <span className="text-xs text-emerald-400/80 shrink-0">{task.estimatedTimeSaved}</span>
+                <span className="hidden shrink-0 text-xs text-emerald-400/80 sm:inline">{task.estimatedTimeSaved}</span>
               </div>
             ))}
           </div>

@@ -19,11 +19,19 @@ import { useWorkspace } from '@/hooks/use-workspace'
 import type { GeneratedVideo, VideoScript } from '@/types'
 import type { PixverseModel, PixverseQuality } from '@/lib/ai/pixverse'
 import {
+  OPENROUTER_VIDEO_ASPECT_RATIOS,
+  OPENROUTER_VIDEO_DURATIONS,
+  OPENROUTER_VIDEO_MODELS,
+  OPENROUTER_VIDEO_RESOLUTIONS,
+  PIXVERSE_VIDEO_MODELS,
   VIDEO_ASPECT_RATIOS,
-  VIDEO_MODELS,
   VIDEO_QUALITIES,
   getVideoDurationsForModel,
+  type OpenRouterVideoDurationSec,
+  type OpenRouterVideoModelId,
+  type OpenRouterVideoResolutionId,
   type VideoDurationSec,
+  type VideoProvider,
 } from '@/lib/models/media-options'
 import {
   Archive,
@@ -46,9 +54,14 @@ export default function VideoStudioPage() {
   const [videos, setVideos] = useState<GeneratedVideo[]>([])
   const [topic, setTopic] = useState('')
   const [videoPrompt, setVideoPrompt] = useState('')
-  const [videoModel, setVideoModel] = useState<PixverseModel>('v4.5')
+  const [videoProvider, setVideoProvider] = useState<VideoProvider>('layered')
+  const [videoModel, setVideoModel] = useState<PixverseModel>('v6')
+  const [openRouterVideoModel, setOpenRouterVideoModel] = useState<OpenRouterVideoModelId>('openai/sora-2-pro')
   const [videoDuration, setVideoDuration] = useState<VideoDurationSec>(5)
+  const [openRouterDuration, setOpenRouterDuration] = useState<OpenRouterVideoDurationSec>(5)
   const [videoQuality, setVideoQuality] = useState<PixverseQuality>('540p')
+  const [openRouterResolution, setOpenRouterResolution] = useState<OpenRouterVideoResolutionId>('1080p')
+  const [generateAudio, setGenerateAudio] = useState(false)
   const [aspectRatio, setAspectRatio] = useState<(typeof VIDEO_ASPECT_RATIOS)[number]['id']>('9:16')
   const [customPromptDetails, setCustomPromptDetails] = useState('')
   const [brandThemeId, setBrandThemeId] = useState('')
@@ -61,6 +74,10 @@ export default function VideoStudioPage() {
   const [latestVideo, setLatestVideo] = useState<GeneratedVideo | null>(null)
 
   const durationOptions = getVideoDurationsForModel(videoModel)
+  const isLayered = videoProvider === 'layered'
+  const isOpenRouter = videoProvider === 'openrouter'
+  const isPixverseOnly = videoProvider === 'pixverse'
+  const activeAspectRatios = isPixverseOnly ? VIDEO_ASPECT_RATIOS : OPENROUTER_VIDEO_ASPECT_RATIOS
   const contentDrafts = data?.contentDrafts ?? []
   const topicCount = data?.topics?.length ?? 0
 
@@ -83,8 +100,11 @@ export default function VideoStudioPage() {
     void fetch('/api/media/providers')
       .then((r) => r.json())
       .then((json) => {
-        if (!json.success || !json.data.defaultVideoModel) return
-        setVideoModel(json.data.defaultVideoModel)
+        if (!json.success) return
+        if (json.data.defaultVideoProvider) setVideoProvider(json.data.defaultVideoProvider)
+        if (json.data.defaultVideoModel) setVideoModel(json.data.defaultVideoModel)
+        if (json.data.defaultOpenRouterVideoModel) setOpenRouterVideoModel(json.data.defaultOpenRouterVideoModel)
+        if (json.data.videoLayer?.resolution) setOpenRouterResolution(json.data.videoLayer.resolution)
       })
       .catch(() => {})
   }, [])
@@ -138,10 +158,14 @@ export default function VideoStudioPage() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           prompt,
-          model: videoModel,
+          videoProvider,
+          model: isPixverseOnly ? videoModel : openRouterVideoModel,
+          pixverseModel: isLayered || isPixverseOnly ? videoModel : undefined,
           aspectRatio,
-          duration: videoDuration,
-          quality: videoQuality,
+          duration: isPixverseOnly ? videoDuration : openRouterDuration,
+          quality: isPixverseOnly || isLayered ? videoQuality : undefined,
+          resolution: isLayered || isOpenRouter ? openRouterResolution : undefined,
+          generateAudio: isLayered || isOpenRouter ? generateAudio : undefined,
           customPromptDetails: customPromptDetails.trim() || undefined,
           brandThemeId: brandThemeId && brandThemeId !== 'none' ? brandThemeId : undefined,
         }),
@@ -156,8 +180,10 @@ export default function VideoStudioPage() {
       }
       toast.success(
         json.data.live
-          ? `Video generated with PixVerse ${videoModel}`
-          : 'Demo video — set PIXVERSE_API_KEY for live generation',
+          ? isLayered
+            ? `Video generated · ${json.data.video.provider} ${json.data.video.model}`
+            : `Video generated with ${isOpenRouter ? openRouterVideoModel : `PixVerse ${videoModel}`}`
+          : 'Demo video — set OPENROUTER_API_KEY and/or PIXVERSE_API_KEY for live generation',
       )
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to generate video')
@@ -187,10 +213,14 @@ export default function VideoStudioPage() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             prompt: script.aiVideoPrompt,
-            model: videoModel,
+            videoProvider,
+            model: isPixverseOnly ? videoModel : openRouterVideoModel,
+            pixverseModel: isLayered || isPixverseOnly ? videoModel : undefined,
             aspectRatio,
-            duration: videoDuration,
-            quality: videoQuality,
+            duration: isPixverseOnly ? videoDuration : openRouterDuration,
+            quality: isPixverseOnly || isLayered ? videoQuality : undefined,
+            resolution: isLayered || isOpenRouter ? openRouterResolution : undefined,
+            generateAudio: isLayered || isOpenRouter ? generateAudio : undefined,
             customPromptDetails: customPromptDetails.trim() || undefined,
             brandThemeId: brandThemeId && brandThemeId !== 'none' ? brandThemeId : undefined,
           }),
@@ -230,7 +260,7 @@ export default function VideoStudioPage() {
         <div>
           <h1 className="text-2xl md:text-3xl font-display tracking-tight mb-1">Video Studio</h1>
           <p className="text-muted-foreground text-sm">
-            Multi-agent reel pipelines · content adaptation · promotion campaigns · PixVerse render
+            Multi-agent reel pipelines · layered OpenRouter video (best first) · PixVerse fallback
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -242,7 +272,12 @@ export default function VideoStudioPage() {
           </Button>
           <Badge variant="secondary" className="w-fit gap-1.5 py-1.5 px-3">
             <Film className="size-3.5" />
-            PixVerse {videoModel} · {videoDuration}s · {aspectRatio}
+            {isLayered
+              ? `Layered · ${openRouterVideoModel} → PixVerse ${videoModel}`
+              : isOpenRouter
+                ? openRouterVideoModel
+                : `PixVerse ${videoModel}`}{' '}
+            · {isPixverseOnly ? videoDuration : openRouterDuration}s · {aspectRatio}
           </Badge>
         </div>
       </div>
@@ -365,42 +400,108 @@ export default function VideoStudioPage() {
                   />
                 </div>
                 <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                  <div className="flex flex-col gap-1.5">
-                    <Label>Model</Label>
-                    <Select value={videoModel} onValueChange={(v) => setVideoModel(v as PixverseModel)}>
+                  <div className="flex flex-col gap-1.5 md:col-span-2">
+                    <Label>Provider</Label>
+                    <Select value={videoProvider} onValueChange={(v) => setVideoProvider(v as VideoProvider)}>
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {VIDEO_MODELS.map((m) => (
-                          <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
-                        ))}
+                        <SelectItem value="layered">Auto (layered — best first, PixVerse last)</SelectItem>
+                        <SelectItem value="openrouter">OpenRouter only</SelectItem>
+                        <SelectItem value="pixverse">PixVerse only</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
+                  {!isPixverseOnly && (
+                    <div className="flex flex-col gap-1.5 md:col-span-2">
+                      <Label>{isLayered ? 'Preferred OpenRouter model' : 'Model'}</Label>
+                      <Select
+                        value={openRouterVideoModel}
+                        onValueChange={(v) => setOpenRouterVideoModel(v as OpenRouterVideoModelId)}
+                      >
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {OPENROUTER_VIDEO_MODELS.map((m) => (
+                            <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {(isLayered || isPixverseOnly) && (
+                    <div className="flex flex-col gap-1.5 md:col-span-2">
+                      <Label>{isLayered ? 'PixVerse fallback model' : 'Model'}</Label>
+                      <Select value={videoModel} onValueChange={(v) => setVideoModel(v as PixverseModel)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {PIXVERSE_VIDEO_MODELS.map((m) => (
+                            <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div className="flex flex-col gap-1.5">
                     <Label>Duration</Label>
                     <Select
-                      value={String(videoDuration)}
-                      onValueChange={(v) => setVideoDuration(Number(v) as VideoDurationSec)}
+                      value={String(isPixverseOnly ? videoDuration : openRouterDuration)}
+                      onValueChange={(v) =>
+                        isPixverseOnly
+                          ? setVideoDuration(Number(v) as VideoDurationSec)
+                          : setOpenRouterDuration(Number(v) as OpenRouterVideoDurationSec)
+                      }
                     >
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {durationOptions.map((sec) => (
+                        {(isPixverseOnly ? durationOptions : OPENROUTER_VIDEO_DURATIONS).map((sec) => (
                           <SelectItem key={sec} value={String(sec)}>{sec}s</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
-                  <div className="flex flex-col gap-1.5">
-                    <Label>Quality</Label>
-                    <Select value={videoQuality} onValueChange={(v) => setVideoQuality(v as PixverseQuality)}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        {VIDEO_QUALITIES.map((q) => (
-                          <SelectItem key={q.id} value={q.id}>{q.label}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
+                  {!isOpenRouter && (
+                    <div className="flex flex-col gap-1.5">
+                      <Label>PixVerse quality</Label>
+                      <Select value={videoQuality} onValueChange={(v) => setVideoQuality(v as PixverseQuality)}>
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {VIDEO_QUALITIES.map((q) => (
+                            <SelectItem key={q.id} value={q.id}>{q.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {!isPixverseOnly && (
+                    <div className="flex flex-col gap-1.5">
+                      <Label>Resolution</Label>
+                      <Select
+                        value={openRouterResolution}
+                        onValueChange={(v) => setOpenRouterResolution(v as OpenRouterVideoResolutionId)}
+                      >
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          {OPENROUTER_VIDEO_RESOLUTIONS.map((q) => (
+                            <SelectItem key={q.id} value={q.id}>{q.label}</SelectItem>
+                          ))}
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
+                  {!isPixverseOnly && (
+                    <div className="flex flex-col gap-1.5">
+                      <Label>Audio</Label>
+                      <Select
+                        value={generateAudio ? 'on' : 'off'}
+                        onValueChange={(v) => setGenerateAudio(v === 'on')}
+                      >
+                        <SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="off">Off</SelectItem>
+                          <SelectItem value="on">Generate audio</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                  )}
                   <div className="flex flex-col gap-1.5">
                     <Label>Aspect ratio</Label>
                     <Select
@@ -411,7 +512,7 @@ export default function VideoStudioPage() {
                     >
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {VIDEO_ASPECT_RATIOS.map((ar) => (
+                        {activeAspectRatios.map((ar) => (
                           <SelectItem key={ar.id} value={ar.id}>{ar.label}</SelectItem>
                         ))}
                       </SelectContent>
@@ -423,12 +524,12 @@ export default function VideoStudioPage() {
                 brandProfile={data?.brandProfile}
                 value={brandThemeId || data?.brandProfile?.activeThemeId || 'none'}
                 onChange={setBrandThemeId}
-                description="Apply extracted brand palette and visual style to PixVerse generation."
+                description="Apply extracted brand palette and visual style to video generation."
               />
               <CustomPromptPanel
                 value={customPromptDetails}
                 onChange={setCustomPromptDetails}
-                description="Motion, pacing, camera movement, style notes for PixVerse."
+                description="Motion, pacing, camera movement, style notes for the video model."
                 placeholder="e.g. Smooth camera pan, cinematic lighting, vertical Reel style..."
               />
               <div className="flex flex-wrap justify-end gap-2">

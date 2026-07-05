@@ -9,6 +9,8 @@ import {
   isValidGptImage2Thinking,
   isValidImagePromptModel,
   isValidImageRenderModel,
+  isValidOpenRouterImageQuality,
+  isValidOpenRouterImageResolution,
 } from '@/lib/models/media-options'
 import { resolveApiWorkspaceContext } from '@/lib/workspace/api-context'
 import { getWorkspace, patchWorkspace } from '@/lib/workspace/store'
@@ -47,6 +49,14 @@ export async function POST(request: Request) {
       typeof body.gptImageThinking === 'string' && isValidGptImage2Thinking(body.gptImageThinking)
         ? body.gptImageThinking
         : undefined
+    const openrouterResolution =
+      typeof body.openrouterResolution === 'string' && isValidOpenRouterImageResolution(body.openrouterResolution)
+        ? body.openrouterResolution
+        : undefined
+    const openrouterQuality =
+      typeof body.openrouterQuality === 'string' && isValidOpenRouterImageQuality(body.openrouterQuality)
+        ? body.openrouterQuality
+        : undefined
 
     const image = await generateMarketingImage({
       prompt,
@@ -60,6 +70,8 @@ export async function POST(request: Request) {
       gptImageQuality,
       gptImage2Resolution,
       gptImageThinking,
+      openrouterResolution,
+      openrouterQuality,
       modelRouting: ws.modelRouting,
       research: ws.research,
       signals: mergeCrustdataSignals({ topic: prompt }, ws.brandProfile, ws.research, ws.campaign),

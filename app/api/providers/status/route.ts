@@ -3,7 +3,9 @@ import {
   configuredEnvVarNames,
   defaultImagePromptModel,
   defaultImageRenderModel,
+  defaultOpenRouterVideoModel,
   defaultVideoModel,
+  defaultVideoProvider,
   getAppProviders,
 } from '@/lib/env/providers'
 import { mediaProvidersAvailable } from '@/lib/ai/media-generate'
@@ -25,6 +27,8 @@ export async function GET() {
       openaiImageModel: OPENAI_IMAGE_MODEL,
       kimiModel: KIMI_MODEL,
       videoModel: defaultVideoModel(),
+      openRouterVideoModel: defaultOpenRouterVideoModel(),
+      videoProvider: defaultVideoProvider(),
     },
     configured: configuredEnvVarNames(),
     stack: {
@@ -33,8 +37,8 @@ export async function GET() {
         : null,
       data: [providers.brightdata && 'brightdata', providers.crustdata && 'crustdata'].filter(Boolean).join('+') || null,
       imagePrompt: media.kimi ? 'kimi' : media.openai ? 'openai' : null,
-      imageRender: media.openai ? 'openai' : 'pollinations',
-      video: media.pixverse ? 'pixverse' : null,
+      imageRender: media.openrouter ? 'openrouter' : media.openai ? 'openai' : 'pollinations',
+      video: media.openrouter && media.pixverse ? 'layered' : media.openrouter ? 'openrouter' : media.pixverse ? 'pixverse' : null,
       persistence: providers.supabasePersistence ? 'supabase' : providers.demoMode ? 'demo' : 'memory',
     },
   })

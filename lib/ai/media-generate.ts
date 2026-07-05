@@ -10,10 +10,12 @@ import {
   getImagePromptProvider,
   getImageRenderProvider,
   isOpenAIRenderModel,
+  isOpenRouterRenderModel,
   isPollinationsRenderModel,
   isValidImagePromptModel,
   isValidImageRenderModel,
   toOpenAIImageModel,
+  toOpenRouterImageModel,
   toPollinationsModel,
   type ImageAspectRatioId,
   type ImagePromptModelId,
@@ -21,6 +23,11 @@ import {
   type GptImageQualityId,
   type GptImage2ResolutionId,
   type GptImage2ThinkingId,
+  type OpenRouterImageQualityId,
+  type OpenRouterImageResolutionId,
+  type OpenRouterVideoModelId,
+  type OpenRouterVideoResolutionId,
+  type VideoProvider,
 } from '@/lib/models/media-options'
 import { enhanceImagePrompt, hasKimi, renderImageFromPrompt } from './kimi'
 import {
@@ -30,7 +37,15 @@ import {
   renderImageWithOpenAI,
   type DalleQuality,
 } from './openai-image'
+import { generateVideoWithOpenRouter, hasOpenRouter, openRouterVideoProxyUrl, renderImageWithOpenRouter } from './openrouter'
 import { generateVideo, hasPixverse, type PixverseModel, type PixverseQuality } from './pixverse'
+import {
+  buildVideoLayerChain,
+  defaultOpenRouterGenerateAudio,
+  defaultOpenRouterVideoResolution,
+  defaultVideoLayerMode,
+} from '@/lib/env/video-layer'
+import { normalizePixverseVideoParams } from '@/lib/models/media-options'
 
 function buildBrandContext(profile?: BrandProfile, theme?: ExtractedBrandTheme): string {
   const p = profile ?? demoBrandProfile
@@ -127,6 +142,8 @@ export async function generateMarketingImage(input: {
   gptImageQuality?: GptImageQualityId
   gptImage2Resolution?: GptImage2ResolutionId
   gptImageThinking?: GptImage2ThinkingId
+  openrouterResolution?: OpenRouterImageResolutionId
+  openrouterQuality?: OpenRouterImageQualityId
   modelRouting?: ModelRouting[]
   research?: MarketResearch | null
   signals?: CrustdataTaskInput
@@ -172,6 +189,21 @@ export async function generateMarketingImage(input: {
     }
   }
 
+  if (!imageUrl && isOpenRouterRenderModel(renderModelId) && hasOpenRouter()) {
+    try {
+      imageUrl = await renderImageWithOpenRouter({
+        prompt: brief.enhancedPrompt,
+        model: toOpenRouterImageModel(renderModelId),
+        aspectRatio,
+        resolution: input.openrouterResolution,
+        quality: input.openrouterQuality,
+      })
+      provider = 'OpenRouter'
+    } catch (err) {
+      renderErrors.push(`OpenRouter: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
   if (!imageUrl && isPollinationsRenderModel(renderModelId)) {
     try {
       imageUrl = await renderImageFromPrompt(brief.enhancedPrompt, aspectRatio, {
@@ -201,6 +233,9 @@ export async function generateMarketingImage(input: {
     if (renderProvider === 'openai' && !hasOpenAIImage() && !isPollinationsRenderModel(renderModelId)) {
       throw new Error('OPENAI_API_KEY is required for OpenAI image models. Add it to your .env.local file.')
     }
+    if (renderProvider === 'openrouter' && !hasOpenRouter()) {
+      throw new Error('OPENROUTER_API_KEY is required for OpenRouter image models. Add it to your .env.local file.')
+    }
     throw new Error(
       renderErrors.length
         ? `Image render failed — ${renderErrors.join('; ')}`
@@ -226,9 +261,13 @@ export async function generateMarketingImage(input: {
 
 export async function generateMarketingVideo(input: {
   prompt: string
-  model?: PixverseModel
+  videoProvider?: VideoProvider
+  model?: PixverseModel | OpenRouterVideoModelId | string
+  pixverseModel?: PixverseModel
   duration?: number
   quality?: PixverseQuality
+  resolution?: OpenRouterVideoResolutionId
+  generateAudio?: boolean
   aspectRatio?: '16:9' | '9:16' | '1:1' | '4:3' | '3:4'
   brandProfile?: BrandProfile
   brandThemeId?: string
@@ -238,18 +277,22 @@ export async function generateMarketingVideo(input: {
   research?: MarketResearch | null
   signals?: CrustdataTaskInput
 }): Promise<GeneratedVideo> {
-  if (!hasPixverse()) {
-    throw new Error('PIXVERSE_API_KEY is required for video generation. Add it to your .env.local file.')
-  }
+  const mode = input.videoProvider || defaultVideoLayerMode()
+  const layerChain = buildVideoLayerChain({
+    mode,
+    preferredOpenRouterModel:
+      typeof input.model === 'string' && input.model.includes('/') ? input.model : undefined,
+    preferredPixverseModel:
+      input.pixverseModel ||
+      (typeof input.model === 'string' && !input.model.includes('/') ? (input.model as PixverseModel) : undefined),
+    modelRouting: input.modelRouting,
+  })
 
-  const videoConfig = resolveTaskModel(MODEL_TASK.VIDEO_GENERATION, input.modelRouting)
-  const modelChain = [
-    input.model,
-    modelDisplayNameToId(videoConfig.model),
-    videoConfig.fallbackModel ? modelDisplayNameToId(videoConfig.fallbackModel) : undefined,
-    'v4.5',
-    'v6',
-  ].filter((m, i, arr): m is PixverseModel => Boolean(m) && arr.indexOf(m) === i) as PixverseModel[]
+  if (!layerChain.length) {
+    throw new Error(
+      'No video provider configured. Add OPENROUTER_API_KEY and/or PIXVERSE_API_KEY to your .env.local file.',
+    )
+  }
 
   const theme = resolveBrandTheme(input.brandProfile, input.brandThemeId)
   const brandContext = buildBrandContext(input.brandProfile, theme)
@@ -262,50 +305,73 @@ export async function generateMarketingVideo(input: {
     ? `${input.prompt}. Brand: ${brandContext}.${trendContext} ${input.customPromptDetails}`
     : `${input.prompt}. ${brandContext}.${trendContext}`
 
+  const resolution = input.resolution || defaultOpenRouterVideoResolution()
+  const generateAudio = input.generateAudio ?? defaultOpenRouterGenerateAudio()
+  const duration = input.duration ?? 5
+  const aspectRatio = input.aspectRatio || '16:9'
   const errors: string[] = []
-  let videoId: number | undefined
-  let url: string | undefined
-  let status: Awaited<ReturnType<typeof generateVideo>>['status'] | undefined
-  let usedModel: PixverseModel = modelChain[0] || 'v4.5'
 
-  for (const pixverseModel of modelChain) {
+  for (const step of layerChain) {
     try {
+      if (step.provider === 'openrouter') {
+        if (!hasOpenRouter()) continue
+        const result = await generateVideoWithOpenRouter({
+          prompt: fullPrompt,
+          model: step.model,
+          duration,
+          resolution,
+          aspectRatio: aspectRatio as '16:9' | '9:16' | '1:1' | '4:3' | '3:4',
+          generateAudio,
+          wait: input.wait !== false,
+        })
+        return {
+          id: id('vid'),
+          prompt: input.prompt,
+          videoUrl: result.url || openRouterVideoProxyUrl(result.jobId),
+          model: step.model,
+          provider: 'OpenRouter',
+          duration,
+          aspectRatio,
+          status: result.url ? 'completed' : result.status === 'completed' ? 'completed' : 'processing',
+          createdAt: new Date().toISOString(),
+        }
+      }
+
+      if (!hasPixverse()) continue
+      const pixverseModel = step.model as PixverseModel
+      const { duration: pxDuration, quality } = normalizePixverseVideoParams({
+        model: pixverseModel,
+        duration,
+        quality: input.quality || '720p',
+      })
       const result = await generateVideo({
         prompt: fullPrompt,
         model: pixverseModel,
-        duration: input.duration ?? 5,
-        quality: input.quality || '540p',
-        aspectRatio: input.aspectRatio || '16:9',
+        duration: pxDuration,
+        quality,
+        aspectRatio,
         wait: input.wait !== false,
       })
-      videoId = result.videoId
-      url = result.url
-      status = result.status
-      usedModel = pixverseModel
-      break
+      return {
+        id: id('vid'),
+        prompt: input.prompt,
+        videoUrl: result.url,
+        videoId: result.videoId,
+        model: `pixverse-${pixverseModel}`,
+        provider: 'PixVerse',
+        duration: pxDuration,
+        aspectRatio,
+        status: result.url ? 'completed' : result.status.status === 5 ? 'processing' : 'failed',
+        createdAt: new Date().toISOString(),
+      }
     } catch (err) {
-      errors.push(`${pixverseModel}: ${err instanceof Error ? err.message : String(err)}`)
+      errors.push(`${step.provider}/${step.model}: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
-  if (videoId === undefined || !status) {
-    throw new Error(errors.length ? `Video generation failed — ${errors.join('; ')}` : 'Video generation failed')
-  }
-
-  return {
-    id: id('vid'),
-    prompt: input.prompt,
-    videoUrl: url,
-    videoId,
-    model: `pixverse-${usedModel}`,
-    provider: 'PixVerse',
-    duration: input.duration ?? 5,
-    aspectRatio: input.aspectRatio || '16:9',
-    status: url ? 'completed' : status.status === 5 ? 'processing' : 'failed',
-    createdAt: new Date().toISOString(),
-  }
+  throw new Error(errors.length ? `Video generation failed — ${errors.join('; ')}` : 'Video generation failed')
 }
 
 export function mediaProvidersAvailable() {
-  return { kimi: hasKimi(), openai: hasOpenAIImage(), pixverse: hasPixverse() }
+  return { kimi: hasKimi(), openai: hasOpenAIImage(), openrouter: hasOpenRouter(), pixverse: hasPixverse() }
 }

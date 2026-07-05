@@ -49,6 +49,22 @@ const MODEL_ALIAS_TO_ID: Record<string, string> = {
   'pixverse v5': 'v5',
   'pixverse v5.5': 'v5.5',
   'pixverse v6': 'v6',
+  'sora 2 pro': 'openai/sora-2-pro',
+  'veo 3.1 lite': 'google/veo-3.1-lite',
+  'veo 3.1 fast': 'google/veo-3.1-fast',
+  'veo 3.1': 'google/veo-3.1',
+  'kling 3.0 pro': 'kwaivgi/kling-v3.0-pro',
+  'kling 3.0 std': 'kwaivgi/kling-v3.0-std',
+  'kling video o1': 'kwaivgi/kling-video-o1',
+  'seedance 1.5 pro': 'bytedance/seedance-1-5-pro',
+  'seedance 1.5': 'bytedance/seedance-1-5-pro',
+  'seedance 2.0': 'bytedance/seedance-2.0',
+  'seedance 2.0 fast': 'bytedance/seedance-2.0-fast',
+  'wan 2.6': 'alibaba/wan-2.6',
+  'wan 2.7': 'alibaba/wan-2.7',
+  'hailuo 2.3': 'minimax/hailuo-2.3',
+  'grok imagine video': 'x-ai/grok-imagine-video',
+  'seedream 4.5': 'bytedance-seed/seedream-4.5',
 }
 
 const QUALITY_TASKS = new Set<ModelTaskType>([

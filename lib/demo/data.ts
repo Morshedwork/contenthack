@@ -95,7 +95,7 @@ export const demoModelRouting: ModelRouting[] = [
   { taskType: 'Outreach writing', assignedModel: 'GPT-4o', fallbackModel: 'GPT-4.1', temperature: 0.6, maxTokens: 1536, costEstimate: '$0.04/message', qualityPriority: 'quality' },
   { taskType: 'Analytics summary', assignedModel: 'GPT-4o mini', fallbackModel: 'GPT-4.1 mini', temperature: 0.3, maxTokens: 2048, costEstimate: '$0.02/report', qualityPriority: 'speed' },
   { taskType: 'Image generation', assignedModel: 'GPT Image 1.5', fallbackModel: 'GPT Image 1', temperature: 0.7, maxTokens: 1024, costEstimate: '$0.04/image', qualityPriority: 'quality' },
-  { taskType: 'Video generation', assignedModel: 'PixVerse v4.5', fallbackModel: 'PixVerse v6', temperature: 0.8, maxTokens: 512, costEstimate: '$0.15/video', qualityPriority: 'quality' },
+  { taskType: 'Video generation', assignedModel: 'Sora 2 Pro', fallbackModel: 'Veo 3.1', temperature: 0.8, maxTokens: 512, costEstimate: '$0.25/video', qualityPriority: 'quality' },
 ]
 
 export const demoMarketResearch: MarketResearch = {
