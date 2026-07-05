@@ -2,6 +2,7 @@
 
 import { useState } from 'react'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
+import { ContentDraftEditor } from '@/components/content/content-draft-editor'
 import { ContentPreviewCard } from '@/components/content/content-preview-card'
 import { TopicGenerator } from '@/components/content/topic-generator'
 import { CustomPromptPanel } from '@/components/shared/custom-prompt-panel'
@@ -21,8 +22,9 @@ function firstPlatformWithDrafts(drafts: ContentDraft[]): StudioPlatform {
 }
 
 export default function ContentStudioPage() {
-  const { data, refresh } = useWorkspace()
+  const { data, refresh, patch } = useWorkspace()
   const [activeTopic, setActiveTopic] = useState<GeneratedTopic | null>(null)
+  const [editingDraft, setEditingDraft] = useState<ContentDraft | null>(null)
   const [targetPlatforms, setTargetPlatforms] = useState<Platform[]>([...tabs])
   const [studioTab, setStudioTab] = useState('topics')
   const [localDrafts, setLocalDrafts] = useState<ContentDraft[] | null>(null)
@@ -83,6 +85,14 @@ export default function ContentStudioPage() {
   }
 
   const platformsWithDrafts = [...new Set(drafts.map((draft) => draft.platform))]
+
+  const handleSaveDraft = async (updated: ContentDraft) => {
+    const nextDrafts = drafts.map((d) => (d.id === updated.id ? updated : d))
+    setLocalDrafts(nextDrafts)
+    await patch({ contentDrafts: nextDrafts })
+    await refresh()
+    toast.success('Content updated')
+  }
 
   return (
     <>
@@ -195,7 +205,7 @@ export default function ContentStudioPage() {
                             : content
                         }
                         onRegenerate={() => void handleGenerateContent()}
-                        onEdit={() => toast.info('Opening editor...')}
+                        onEdit={() => setEditingDraft(content)}
                         onApprove={() => toast.success('Sent to approval board')}
                         onSchedule={() => toast.success('Added to calendar')}
                       />
@@ -214,6 +224,15 @@ export default function ContentStudioPage() {
           </Tabs>
         </TabsContent>
       </Tabs>
+
+      <ContentDraftEditor
+        draft={editingDraft}
+        open={editingDraft !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditingDraft(null)
+        }}
+        onSave={handleSaveDraft}
+      />
     </>
   )
 }

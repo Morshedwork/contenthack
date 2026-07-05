@@ -7,9 +7,10 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
 import { PublishLogTable } from '@/components/dashboard/publish-log-table'
+import { ContentDraftEditor } from '@/components/content/content-draft-editor'
 import { useWorkspace } from '@/hooks/use-workspace'
-import type { ContentStatus } from '@/types'
-import { Check, CheckSquare, Edit, Megaphone, X } from 'lucide-react'
+import type { ContentDraft, ContentStatus } from '@/types'
+import { Check, CheckSquare, Edit, GripVertical, Megaphone, X } from 'lucide-react'
 import { toast } from 'sonner'
 
 const columns: { id: ContentStatus; label: string }[] = [
@@ -24,6 +25,9 @@ export default function ApprovalPageClient() {
   const searchParams = useSearchParams()
   const { data, loading, patch, refresh } = useWorkspace()
   const [activeTab, setActiveTab] = useState('approval')
+  const [draggingId, setDraggingId] = useState<string | null>(null)
+  const [dropTarget, setDropTarget] = useState<ContentStatus | null>(null)
+  const [editingDraft, setEditingDraft] = useState<ContentDraft | null>(null)
 
   useEffect(() => {
     const tab = searchParams.get('tab')
@@ -39,9 +43,53 @@ export default function ApprovalPageClient() {
     }
   }
 
+  const handleDragStart = (e: React.DragEvent, itemId: string) => {
+    setDraggingId(itemId)
+    e.dataTransfer.effectAllowed = 'move'
+    e.dataTransfer.setData('text/plain', itemId)
+  }
+
+  const handleDragEnd = () => {
+    setDraggingId(null)
+    setDropTarget(null)
+  }
+
+  const handleDragOver = (e: React.DragEvent, colId: ContentStatus) => {
+    e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
+    setDropTarget(colId)
+  }
+
+  const handleDrop = (e: React.DragEvent, colId: ContentStatus) => {
+    e.preventDefault()
+    const itemId = e.dataTransfer.getData('text/plain')
+    setDraggingId(null)
+    setDropTarget(null)
+    const item = data?.approvalItems.find((i) => i.id === itemId)
+    if (item && item.status !== colId) {
+      void moveItem(itemId, colId)
+    }
+  }
+
   const publishPlatforms = (data?.integrations ?? []).filter((i) =>
     ['linkedin', 'instagram', 'facebook', 'x', 'tiktok', 'youtube'].includes(i.id),
   )
+
+  const handleSaveDraft = async (updated: ContentDraft) => {
+    const nextDrafts = (data?.contentDrafts ?? []).map((d) => (d.id === updated.id ? updated : d))
+    await patch({ contentDrafts: nextDrafts })
+    await refresh()
+    toast.success('Content updated')
+  }
+
+  const openEditor = (itemId: string) => {
+    const draft = data?.contentDrafts.find((d) => d.id === itemId)
+    if (draft) {
+      setEditingDraft(draft)
+    } else {
+      toast.error('Draft not found — try refreshing the page')
+    }
+  }
 
   const publishPost = async (platform: string) => {
     const draft = data?.contentDrafts.find((d) => d.platform === platform) ?? data?.contentDrafts[0]
@@ -103,25 +151,50 @@ export default function ApprovalPageClient() {
         </TabsList>
 
         <TabsContent value="approval">
-          <p className="text-muted-foreground text-sm mb-4">No content can be published unless approved</p>
+          <p className="text-muted-foreground text-sm mb-4">
+            No content can be published unless approved. Drag cards between columns to update status.
+          </p>
           <div className="flex gap-4 overflow-x-auto pb-4">
             {columns.map((col) => (
-              <div key={col.id} className="min-w-[280px] flex-1">
-                <div className="flex items-center justify-between mb-3">
+              <div
+                key={col.id}
+                className={`min-w-[280px] flex-1 rounded-lg transition-colors ${
+                  dropTarget === col.id ? 'bg-primary/5 ring-2 ring-primary/40 ring-inset' : ''
+                }`}
+                onDragOver={(e) => handleDragOver(e, col.id)}
+                onDragLeave={() => setDropTarget((prev) => (prev === col.id ? null : prev))}
+                onDrop={(e) => handleDrop(e, col.id)}
+              >
+                <div className="flex items-center justify-between mb-3 px-1">
                   <h3 className="text-sm font-medium">{col.label}</h3>
                   <Badge variant="secondary" className="text-[10px]">
                     {items.filter((i) => i.status === col.id).length}
                   </Badge>
                 </div>
-                <div className="flex flex-col gap-3">
+                <div className="flex flex-col gap-3 min-h-[120px] px-1 pb-1">
                   {items.filter((i) => i.status === col.id).map((item) => (
-                    <Card key={item.id} className="bg-card/60">
+                    <Card
+                      key={item.id}
+                      className={`bg-card/60 transition-opacity ${draggingId === item.id ? 'opacity-40' : ''}`}
+                    >
                       <CardContent className="p-4">
-                        <div className="flex items-center justify-between mb-2">
-                          <Badge variant="outline" className="text-[10px] capitalize">{item.platform}</Badge>
-                          <Badge variant="outline" className={`text-[10px] ${item.riskLevel === 'low' ? 'text-emerald-400' : 'text-amber-400'}`}>
-                            {item.riskLevel} risk
-                          </Badge>
+                        <div className="flex items-start gap-2 mb-2">
+                          <button
+                            type="button"
+                            draggable
+                            aria-label={`Drag ${item.title}`}
+                            onDragStart={(e) => handleDragStart(e, item.id)}
+                            onDragEnd={handleDragEnd}
+                            className="mt-0.5 shrink-0 rounded p-0.5 text-muted-foreground hover:text-foreground hover:bg-muted cursor-grab active:cursor-grabbing touch-none"
+                          >
+                            <GripVertical className="size-4" />
+                          </button>
+                          <div className="flex flex-1 items-center justify-between gap-2 min-w-0">
+                            <Badge variant="outline" className="text-[10px] capitalize shrink-0">{item.platform}</Badge>
+                            <Badge variant="outline" className={`text-[10px] shrink-0 ${item.riskLevel === 'low' ? 'text-emerald-400' : 'text-amber-400'}`}>
+                              {item.riskLevel} risk
+                            </Badge>
+                          </div>
                         </div>
                         <p className="text-sm font-medium mb-1">{item.title}</p>
                         <p className="text-xs text-muted-foreground mb-3 line-clamp-2">{item.preview}</p>
@@ -154,7 +227,7 @@ export default function ApprovalPageClient() {
                               Publish
                             </Button>
                           )}
-                          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => toast.info('Opening editor')}>
+                          <Button size="sm" variant="ghost" className="h-7 text-xs" onClick={() => openEditor(item.id)}>
                             <Edit />
                           </Button>
                         </div>
@@ -217,6 +290,15 @@ export default function ApprovalPageClient() {
           </Card>
         </TabsContent>
       </Tabs>
+
+      <ContentDraftEditor
+        draft={editingDraft}
+        open={editingDraft !== null}
+        onOpenChange={(open) => {
+          if (!open) setEditingDraft(null)
+        }}
+        onSave={handleSaveDraft}
+      />
     </>
   )
 }
