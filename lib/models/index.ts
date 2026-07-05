@@ -66,5 +66,5 @@ export async function generateTaskOutput(taskType: string, input: string): Promi
 }
 
 export function getRequiredEnvVars() {
-  return ['OPENAI_API_KEY']
+  return ['OPENAI_API_KEY', 'CRUSTDATA_API_KEY', 'KIMI_API_KEY', 'PIXVERSE_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY']
 }

@@ -1,8 +1,9 @@
 import { apiFromError, apiSuccess } from '@/lib/api-utils'
 import { withOpenAI } from '@/lib/ai/openai'
+import { mergeCrustdataSignals } from '@/lib/ai/crustdata'
 import { generateContentDrafts } from '@/lib/ai/generate'
 import { MODEL_TASK, resolveTaskModel } from '@/lib/models/routing'
-import { resolveMcpWorkspaceContext } from '@/lib/mcp/access'
+import { resolveApiWorkspaceContext } from '@/lib/workspace/api-context'
 import { getWorkspace, patchWorkspace } from '@/lib/workspace/store'
 import type { Platform } from '@/types'
 
@@ -31,7 +32,7 @@ function resolvePlatforms(bodyPlatforms: unknown, campaignPlatforms: Platform[])
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}))
-    const ctx = await resolveMcpWorkspaceContext(request)
+    const ctx = await resolveApiWorkspaceContext(request)
     const ws = await getWorkspace(ctx)
     const platforms = resolvePlatforms(body.platforms, ws.campaign.platforms)
     const modelConfig = resolveTaskModel(MODEL_TASK.CONTENT_GENERATION, ws.modelRouting)
@@ -44,6 +45,8 @@ export async function POST(request: Request) {
         campaignId: body.campaignId || ws.campaign.id,
         customPromptDetails: body.customPromptDetails,
         brandProfile: ws.brandProfile,
+        research: ws.research,
+        signals: mergeCrustdataSignals({ topic: body.topic }, ws.brandProfile, ws.research, ws.campaign),
         modelConfig,
       }),
     )

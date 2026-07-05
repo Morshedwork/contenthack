@@ -7,8 +7,10 @@ import type {
   TraeSoloTopicResult,
 } from '@/types'
 import { generateJSON, withOpenAI } from '@/lib/ai/openai'
+import { crustdataPromptBlock, fetchTaskContext, mergeCrustdataSignals, type CrustdataTaskInput } from '@/lib/ai/crustdata'
 import { appendCustomPrompt, normalizeCustomPromptDetails } from '@/lib/ai/prompt-utils'
 import { MODEL_TASK, resolveTaskModel, type TaskModelConfig } from '@/lib/models/routing'
+import type { MarketResearch } from '@/types'
 
 const PILLAR_TEMPLATES = [
   { name: 'Problem Awareness', description: 'Pain points and challenges your audience faces' },
@@ -182,7 +184,12 @@ async function generateTopicsDemo(brief: TopicBrief): Promise<GeneratedTopic[]> 
     .slice(0, brief.topicCount)
 }
 
-async function generateTopicsOpenAI(brief: TopicBrief, modelConfig?: TaskModelConfig): Promise<GeneratedTopic[]> {
+async function generateTopicsOpenAI(
+  brief: TopicBrief,
+  modelConfig?: TaskModelConfig,
+  research?: MarketResearch | null,
+  signals?: CrustdataTaskInput,
+): Promise<GeneratedTopic[]> {
   const mc = modelConfig ?? resolveTaskModel(MODEL_TASK.CONTENT_GENERATION)
   const pillarNames = PILLAR_TEMPLATES.map((p) => p.name)
   const platforms = brief.platforms.join(', ')
@@ -190,6 +197,19 @@ async function generateTopicsOpenAI(brief: TopicBrief, modelConfig?: TaskModelCo
   const baseBlock = brief.baseContent.trim()
     ? `Base content:\n"""\n${brief.baseContent.trim().slice(0, 2000)}\n"""`
     : ''
+  const crustdataContext = await fetchTaskContext(
+    MODEL_TASK.CONTENT_GENERATION,
+    mergeCrustdataSignals(
+      {
+        goal: brief.goal,
+        topic: brief.title,
+        targetCustomer: brief.targetAudience,
+        ...signals,
+      },
+      undefined,
+      research,
+    ),
+  )
 
   const data = await generateJSON<{ topics?: unknown[] }>({
     model: mc.model,
@@ -197,9 +217,9 @@ async function generateTopicsOpenAI(brief: TopicBrief, modelConfig?: TaskModelCo
     temperature: mc.temperature,
     maxTokens: mc.maxTokens,
     system:
-      'You are an autonomous content strategy agent. Respond with a single valid JSON object only. No markdown. No extra keys.',
+      'You are an autonomous content strategy agent. When CrustData evidence is provided, ground topics in real market signals. Respond with a single valid JSON object only. No markdown. No extra keys.',
     user: appendCustomPrompt(`Generate ${brief.topicCount} high-intent content topics for this brief.
-
+${crustdataPromptBlock(crustdataContext, 'strategy data')}
 Brief title: ${brief.title}
 Goal: ${brief.goal}
 Target audience: ${brief.targetAudience}
@@ -266,9 +286,13 @@ Return JSON with exactly this shape:
 }
 
 export async function runTraeSoloTopicGeneration(
-  briefInput: Partial<TopicBrief> & { modelConfig?: TaskModelConfig },
+  briefInput: Partial<TopicBrief> & {
+    modelConfig?: TaskModelConfig
+    research?: MarketResearch | null
+    signals?: CrustdataTaskInput
+  },
 ): Promise<TraeSoloTopicResult> {
-  const { modelConfig, ...rest } = briefInput
+  const { modelConfig, research, signals, ...rest } = briefInput
   const brief = validateTopicBrief(rest)
   const executionSteps = [
     'TRAE Solo: Parsing structured brief (title, goal, points, base content)',
@@ -277,7 +301,7 @@ export async function runTraeSoloTopicGeneration(
     'TRAE Solo: Generating hooks, angles, and format recommendations',
   ]
 
-  const { result: topics } = await withOpenAI(() => generateTopicsOpenAI(brief, modelConfig))
+  const { result: topics } = await withOpenAI(() => generateTopicsOpenAI(brief, modelConfig, research, signals))
   if (!topics.length) {
     throw new Error('OpenAI returned no topics — try adding more key points or base content')
   }

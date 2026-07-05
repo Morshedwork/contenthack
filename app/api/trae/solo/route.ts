@@ -1,9 +1,10 @@
 import { apiError, apiFromError, apiSuccess } from '@/lib/api-utils'
+import { mergeCrustdataSignals } from '@/lib/ai/crustdata'
 import { generateContentDrafts } from '@/lib/ai/generate'
 import { withOpenAI } from '@/lib/ai/openai'
 import { runTraeSoloTopicGeneration, TRAE_SOLO_CAPABILITIES, validateTopicBrief } from '@/lib/trae/solo'
 import { MODEL_TASK, resolveTaskModel } from '@/lib/models/routing'
-import { resolveMcpWorkspaceContext } from '@/lib/mcp/access'
+import { resolveApiWorkspaceContext } from '@/lib/workspace/api-context'
 import { getWorkspace, patchWorkspace } from '@/lib/workspace/store'
 import type { GeneratedTopic, Platform } from '@/types'
 
@@ -24,7 +25,7 @@ export async function POST(request: Request) {
   try {
     const body = (await request.json()) as TraeSoloRequest
     const action = body.action || 'generate_topics'
-    const ctx = await resolveMcpWorkspaceContext(request)
+    const ctx = await resolveApiWorkspaceContext(request)
     const ws = await getWorkspace(ctx)
 
     switch (action) {
@@ -35,7 +36,13 @@ export async function POST(request: Request) {
         if (!body.brief) return apiError('brief is required for generate_topics', 400)
         validateTopicBrief(body.brief)
         const modelConfig = resolveTaskModel(MODEL_TASK.CONTENT_GENERATION, ws.modelRouting)
-        const result = await runTraeSoloTopicGeneration({ ...body.brief, modelConfig })
+        const dataSignals = mergeCrustdataSignals({}, ws.brandProfile, ws.research, ws.campaign)
+        const result = await runTraeSoloTopicGeneration({
+          ...body.brief,
+          modelConfig,
+          research: ws.research,
+          signals: dataSignals,
+        })
         await patchWorkspace(
           {
             topics: result.topics,
@@ -71,6 +78,8 @@ export async function POST(request: Request) {
             topic: topic.title,
             campaignId: ws.campaign.id,
             brandProfile: ws.brandProfile,
+            research: ws.research,
+            signals: mergeCrustdataSignals({ topic: topic.title }, ws.brandProfile, ws.research, ws.campaign),
             modelConfig: contentModelConfig,
           }),
         )

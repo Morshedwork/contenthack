@@ -2,6 +2,7 @@ import 'server-only'
 
 import type { AgentDefinition, AgentStatus } from '@/types'
 import { generateResearch, generateContentDrafts, generateVideoScripts, generateLeads, generateOutreach, checkBrandSafety } from '@/lib/ai/generate'
+import { mergeCrustdataSignals } from '@/lib/ai/crustdata'
 import { extractBrandThemeFromUrl, isValidCompanyUrl } from '@/lib/ai/brand-theme'
 import { normalizeCustomPromptDetails, platformsFromPromptHint } from '@/lib/ai/prompt-utils'
 import { hasOpenAI, withOpenAI } from '@/lib/ai/openai'
@@ -89,6 +90,7 @@ export async function runAgentTask(
     return task ? resolveTaskModel(task, routing) : undefined
   }
   let live = false
+  const dataSignals = mergeCrustdataSignals({}, ws.brandProfile, ws.research, campaign)
 
   try {
     switch (agentId) {
@@ -102,6 +104,8 @@ export async function runAgentTask(
             offer: campaign.mainOffer,
             customPromptDetails,
             brandProfile: ws.brandProfile,
+            research: ws.research,
+            signals: dataSignals,
             modelConfig: modelFor(agentId),
           }),
         )
@@ -124,6 +128,8 @@ export async function runAgentTask(
           topicCount: 8,
           customPromptDetails,
           modelConfig: modelFor(agentId),
+          research: ws.research,
+          signals: dataSignals,
         })
         live = true
         await patchWorkspace({ topics: result.topics }, ctx)
@@ -146,6 +152,8 @@ export async function runAgentTask(
             campaignId: campaign.id,
             customPromptDetails,
             brandProfile: ws.brandProfile,
+            research: ws.research,
+            signals: mergeCrustdataSignals({ topic }, ws.brandProfile, ws.research, campaign),
             modelConfig: modelFor(agentId),
           }),
         )
@@ -205,7 +213,15 @@ export async function runAgentTask(
         await setAgentRunning(ctx, agentId, 'Short-form video scripts', routing)
         const topic = ws.topics[0]?.title
         const { result, live: aiLive } = await withOpenAI(() =>
-          generateVideoScripts({ topic, count: 3, customPromptDetails, brandProfile: ws.brandProfile, modelConfig: modelFor(agentId) }),
+          generateVideoScripts({
+            topic,
+            count: 3,
+            customPromptDetails,
+            brandProfile: ws.brandProfile,
+            research: ws.research,
+            signals: mergeCrustdataSignals({ topic }, ws.brandProfile, ws.research, campaign),
+            modelConfig: modelFor(agentId),
+          }),
         )
         live = aiLive
         await patchWorkspace({ videoScripts: result }, ctx)
@@ -218,7 +234,13 @@ export async function runAgentTask(
         const draft = ws.contentDrafts[0]
         const content = draft ? `${draft.hook}\n${draft.mainCopy}` : ''
         const { result, live: aiLive } = await withOpenAI(() =>
-          checkBrandSafety({ content, brandProfile: ws.brandProfile, modelConfig: modelFor(agentId) }),
+          checkBrandSafety({
+            content,
+            brandProfile: ws.brandProfile,
+            research: ws.research,
+            signals: dataSignals,
+            modelConfig: modelFor(agentId),
+          }),
         )
         live = aiLive
         const flagged = result.flags.length
@@ -283,7 +305,15 @@ export async function runAgentTask(
         await setAgentRunning(ctx, agentId, 'Prospect discovery', routing)
         const criteria = ws.research?.marketSummary ?? campaign.targetAudience
         const { result, live: aiLive } = await withOpenAI(() =>
-          generateLeads({ count: 10, criteria, customPromptDetails, brandProfile: ws.brandProfile, modelConfig: modelFor(agentId) }),
+          generateLeads({
+            count: 10,
+            criteria,
+            customPromptDetails,
+            brandProfile: ws.brandProfile,
+            research: ws.research,
+            signals: mergeCrustdataSignals({ criteria }, ws.brandProfile, ws.research, campaign),
+            modelConfig: modelFor(agentId),
+          }),
         )
         live = aiLive
         await patchWorkspace({ leads: result }, ctx)
@@ -304,6 +334,13 @@ export async function runAgentTask(
               matchReason: lead.matchReason,
               customPromptDetails,
               brandProfile: ws.brandProfile,
+              research: ws.research,
+              signals: mergeCrustdataSignals(
+                { company: lead.company, leadName: lead.name },
+                ws.brandProfile,
+                ws.research,
+                campaign,
+              ),
               modelConfig: modelFor(agentId),
             }),
           )

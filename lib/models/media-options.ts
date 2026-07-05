@@ -78,8 +78,42 @@ export const VIDEO_MODELS: { id: PixverseModel; label: string; description: stri
   { id: 'v6', label: 'PixVerse v6', description: 'Up to 15s, 1080p, audio' },
 ]
 
-export const VIDEO_DURATIONS = [5, 8, 10, 15] as const
-export type VideoDurationSec = (typeof VIDEO_DURATIONS)[number]
+/** PixVerse v4.5–v5.5: only 5s and 8s. v6 also supports 10s and 15s. */
+export const VIDEO_DURATIONS_V45 = [5, 8] as const
+export const VIDEO_DURATIONS_V6 = [5, 8, 10, 15] as const
+export const VIDEO_DURATIONS = VIDEO_DURATIONS_V6
+export type VideoDurationSec = (typeof VIDEO_DURATIONS_V6)[number]
+
+export function getVideoDurationsForModel(model: PixverseModel): readonly VideoDurationSec[] {
+  return model === 'v6' ? VIDEO_DURATIONS_V6 : VIDEO_DURATIONS_V45
+}
+
+/** PixVerse rejects 1080p at 8s — only 5s is allowed at that quality. */
+export function normalizePixverseVideoParams(input: {
+  model: PixverseModel
+  duration: number
+  quality: PixverseQuality
+}): { duration: VideoDurationSec; quality: PixverseQuality; warnings: string[] } {
+  const allowed = getVideoDurationsForModel(input.model)
+  let duration = allowed.includes(input.duration as VideoDurationSec)
+    ? (input.duration as VideoDurationSec)
+    : allowed[0]
+  let quality = input.quality
+  const warnings: string[] = []
+
+  if (duration !== input.duration) {
+    warnings.push(
+      `Duration ${input.duration}s is not supported on PixVerse ${input.model}; using ${duration}s.`,
+    )
+  }
+
+  if (quality === '1080p' && duration === 8) {
+    duration = 5
+    warnings.push('1080p only supports 5 second videos on PixVerse; duration set to 5s.')
+  }
+
+  return { duration, quality, warnings }
+}
 
 export const VIDEO_QUALITIES: { id: PixverseQuality; label: string }[] = [
   { id: '360p', label: '360p' },
@@ -158,8 +192,9 @@ export function isValidVideoModel(id: string): id is PixverseModel {
   return VIDEO_MODELS.some((m) => m.id === id)
 }
 
-export function isValidVideoDuration(n: number): n is VideoDurationSec {
-  return VIDEO_DURATIONS.includes(n as VideoDurationSec)
+export function isValidVideoDuration(n: number, model?: PixverseModel): n is VideoDurationSec {
+  const allowed = model ? getVideoDurationsForModel(model) : VIDEO_DURATIONS_V6
+  return allowed.includes(n as VideoDurationSec)
 }
 
 export function isValidVideoQuality(id: string): id is PixverseQuality {

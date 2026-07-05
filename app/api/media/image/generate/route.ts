@@ -1,4 +1,5 @@
 import { apiFromError, apiSuccess } from '@/lib/api-utils'
+import { mergeCrustdataSignals } from '@/lib/ai/crustdata'
 import { generateMarketingImage } from '@/lib/ai/media-generate'
 import {
   getImageRenderProvider,
@@ -9,12 +10,14 @@ import {
   isValidImagePromptModel,
   isValidImageRenderModel,
 } from '@/lib/models/media-options'
+import { resolveApiWorkspaceContext } from '@/lib/workspace/api-context'
 import { getWorkspace, patchWorkspace } from '@/lib/workspace/store'
 
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}))
-    const ws = await getWorkspace()
+    const ctx = await resolveApiWorkspaceContext(request)
+    const ws = await getWorkspace(ctx)
     const prompt = String(body.prompt || '').trim()
     if (!prompt) return apiFromError(new Error('Prompt is required'), 'Prompt is required')
 
@@ -58,10 +61,12 @@ export async function POST(request: Request) {
       gptImage2Resolution,
       gptImageThinking,
       modelRouting: ws.modelRouting,
+      research: ws.research,
+      signals: mergeCrustdataSignals({ topic: prompt }, ws.brandProfile, ws.research, ws.campaign),
     })
 
     const images = [image, ...(ws.generatedImages ?? [])].slice(0, 20)
-    await patchWorkspace({ generatedImages: images })
+    await patchWorkspace({ generatedImages: images }, ctx)
 
     const provider = getImageRenderProvider(renderModel || 'flux') || 'pollinations'
     return apiSuccess({ image, images, live: true, provider })

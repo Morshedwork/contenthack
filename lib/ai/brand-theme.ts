@@ -3,6 +3,7 @@ import 'server-only'
 import type { BrandThemeColor, ExtractedBrandTheme } from '@/types'
 import { normalizeHex } from '@/lib/brand/theme-context'
 import { generateJSON, hasOpenAI } from '@/lib/ai/openai'
+import { crustdataPromptBlock, fetchCompanyEnrichByDomain } from '@/lib/ai/crustdata'
 import { MODEL_TASK, resolveTaskModel, type TaskModelConfig } from '@/lib/models/routing'
 
 interface ThemeAnalysis {
@@ -203,14 +204,16 @@ export async function extractBrandThemeFromUrl(
 
   if (hasOpenAI()) {
     const mc = modelConfig ?? resolveTaskModel(MODEL_TASK.CONTENT_GENERATION)
+    const companyContext = await fetchCompanyEnrichByDomain(hostname)
     const analysis = await generateJSON<ThemeAnalysis>({
       model: mc.model,
       fallbackModel: mc.fallbackModel,
       temperature: mc.temperature,
       maxTokens: mc.maxTokens,
       system:
-        'You are a brand identity analyst. Extract a cohesive brand theme palette and visual direction from website signals. Always return valid JSON with hex colors.',
+        'You are a brand identity analyst. Extract a cohesive brand theme palette and visual direction from website signals. Use CrustData company data when provided. Always return valid JSON with hex colors.',
       user: `Analyze brand theme for: ${sourceUrl}
+${crustdataPromptBlock(companyContext, 'company profile')}
 Site name hint: ${signals.siteName || hostname}
 Colors found in HTML/CSS: ${signals.colors.join(', ') || 'none detected'}
 HTML snippet (first 4000 chars):

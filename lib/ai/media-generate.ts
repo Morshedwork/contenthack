@@ -2,6 +2,9 @@ import type { BrandProfile, GeneratedImage, GeneratedVideo, ExtractedBrandTheme,
 import { DEMO_COMPANY, demoBrandProfile } from '@/lib/demo/data'
 import { buildThemePromptContext, resolveBrandTheme } from '@/lib/brand/theme-context'
 import { MODEL_TASK, resolveMediaModel } from '@/lib/models/routing'
+import { defaultImagePromptModel, defaultImageRenderModel } from '@/lib/env/providers'
+import { crustdataPromptBlock, fetchTaskContext, mergeCrustdataSignals, type CrustdataTaskInput } from '@/lib/ai/crustdata'
+import type { MarketResearch } from '@/types'
 import type { KimiImagePrompt } from './kimi'
 import {
   getImagePromptProvider,
@@ -25,7 +28,6 @@ import {
   enhanceImagePromptWithOpenAI,
   hasOpenAIImage,
   normalizeOpenAIImageModel,
-  OPENAI_IMAGE_MODEL,
   renderImageWithOpenAI,
   type DalleQuality,
 } from './openai-image'
@@ -52,12 +54,12 @@ function resolvePromptModelId(
   const normalized = modelDisplayNameToId(routed)
   if (isValidImagePromptModel(normalized)) return normalized
   if (isValidImagePromptModel(routed)) return routed
-  return hasOpenAIImage() ? 'gpt-4o' : 'kimi-k2.5'
+  return defaultImagePromptModel()
 }
 
 function resolveRenderModelId(explicit?: ImageRenderModelId): ImageRenderModelId {
   if (explicit && isValidImageRenderModel(explicit)) return explicit
-  return hasOpenAIImage() ? (normalizeOpenAIImageModel(OPENAI_IMAGE_MODEL) as ImageRenderModelId) : 'flux'
+  return defaultImageRenderModel()
 }
 
 async function buildImageBrief(input: {
@@ -66,9 +68,17 @@ async function buildImageBrief(input: {
   customPromptDetails?: string
   promptModel?: ImagePromptModelId
   modelRouting?: ModelRouting[]
+  brandProfile?: BrandProfile
+  research?: MarketResearch | null
+  signals?: CrustdataTaskInput
 }): Promise<{ brief: KimiImagePrompt; promptModelLabel: string }> {
   const promptModelId = resolvePromptModelId(input.promptModel, input.modelRouting)
   const promptProvider = getImagePromptProvider(promptModelId) || 'kimi'
+  const crustdataContext = await fetchTaskContext(
+    MODEL_TASK.IMAGE_GENERATION,
+    mergeCrustdataSignals({ topic: input.prompt, ...input.signals }, input.brandProfile, input.research),
+  )
+  const enrichedBrandContext = `${input.brandContext}${crustdataPromptBlock(crustdataContext, 'visual trend data')}`
 
   if (promptProvider === 'openai') {
     if (!hasOpenAIImage()) {
@@ -76,7 +86,7 @@ async function buildImageBrief(input: {
     }
     const brief = await enhanceImagePromptWithOpenAI({
       prompt: input.prompt,
-      brandContext: input.brandContext,
+      brandContext: enrichedBrandContext,
       customPromptDetails: input.customPromptDetails,
       model: promptModelId,
     })
@@ -88,7 +98,7 @@ async function buildImageBrief(input: {
   }
   const brief = await enhanceImagePrompt({
     prompt: input.prompt,
-    brandContext: input.brandContext,
+    brandContext: enrichedBrandContext,
     customPromptDetails: input.customPromptDetails,
     model: promptModelId,
   })
@@ -108,6 +118,8 @@ export async function generateMarketingImage(input: {
   gptImage2Resolution?: GptImage2ResolutionId
   gptImageThinking?: GptImage2ThinkingId
   modelRouting?: ModelRouting[]
+  research?: MarketResearch | null
+  signals?: CrustdataTaskInput
 }): Promise<GeneratedImage> {
   const renderModelId = resolveRenderModelId(input.renderModel)
   const renderProvider = getImageRenderProvider(renderModelId) || 'pollinations'
@@ -132,6 +144,9 @@ export async function generateMarketingImage(input: {
     customPromptDetails: input.customPromptDetails,
     promptModel: input.promptModel,
     modelRouting: input.modelRouting,
+    brandProfile: input.brandProfile,
+    research: input.research,
+    signals: input.signals,
   })
 
   const aspectRatio = input.aspectRatio || brief.aspectRatio
@@ -188,6 +203,8 @@ export async function generateMarketingVideo(input: {
   customPromptDetails?: string
   wait?: boolean
   modelRouting?: ModelRouting[]
+  research?: MarketResearch | null
+  signals?: CrustdataTaskInput
 }): Promise<GeneratedVideo> {
   if (!hasPixverse()) {
     throw new Error('PIXVERSE_API_KEY is required for video generation. Add it to your .env.local file.')
@@ -198,9 +215,14 @@ export async function generateMarketingVideo(input: {
 
   const theme = resolveBrandTheme(input.brandProfile, input.brandThemeId)
   const brandContext = buildBrandContext(input.brandProfile, theme)
+  const crustdataContext = await fetchTaskContext(
+    MODEL_TASK.VIDEO_GENERATION,
+    mergeCrustdataSignals({ topic: input.prompt, ...input.signals }, input.brandProfile, input.research),
+  )
+  const trendContext = crustdataPromptBlock(crustdataContext, 'video trend data')
   const fullPrompt = input.customPromptDetails
-    ? `${input.prompt}. Brand: ${brandContext}. ${input.customPromptDetails}`
-    : `${input.prompt}. ${brandContext}`
+    ? `${input.prompt}. Brand: ${brandContext}.${trendContext} ${input.customPromptDetails}`
+    : `${input.prompt}. ${brandContext}.${trendContext}`
 
   const { videoId, url, status } = await generateVideo({
     prompt: fullPrompt,

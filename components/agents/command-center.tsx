@@ -10,12 +10,14 @@ import { WorkflowPipeline } from './workflow-pipeline'
 import { CustomPromptPanel } from '@/components/shared/custom-prompt-panel'
 import { demoAgents, workflowSteps } from '@/lib/demo/data'
 import { fetchAgentStatus, runAgent, runFullWorkflow } from '@/lib/agents/client'
+import { useWorkspace } from '@/hooks/use-workspace'
 import { getAgentViewLinkByName } from '@/lib/agents/view-links'
 import type { AgentDefinition, AgentTask } from '@/types'
 import { Download, Loader2, Pause, Play, RotateCcw } from 'lucide-react'
 import { toast } from 'sonner'
 
 export function CommandCenter() {
+  const { refresh: refreshWorkspace } = useWorkspace()
   const [agents, setAgents] = useState<AgentDefinition[]>(demoAgents)
   const [tasks, setTasks] = useState<AgentTask[]>([])
   const [running, setRunning] = useState(false)
@@ -47,6 +49,7 @@ export function CommandCenter() {
     try {
       const result = await runFullWorkflow(customPromptDetails.trim() || undefined)
       setAgents(result.agents)
+      await refreshWorkspace()
       toast.success(`Workflow ${result.workflowId} — saved ~${result.estimatedTimeSaved}${result.live ? ' (OpenAI)' : ''}`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Workflow failed')
@@ -63,6 +66,7 @@ export function CommandCenter() {
     try {
       const { agent: updated, live } = await runAgent(id, customPromptDetails.trim() || undefined)
       setAgents((prev) => prev.map((a) => (a.id === id ? updated : a)))
+      await refreshWorkspace()
       toast.success(`${updated.name} — ${updated.progress}%`)
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Agent run failed')

@@ -1,14 +1,15 @@
 import { apiFromError, apiSuccess } from '@/lib/api-utils'
 import { withOpenAI } from '@/lib/ai/openai'
+import { mergeCrustdataSignals } from '@/lib/ai/crustdata'
 import { generateLeads } from '@/lib/ai/generate'
 import { MODEL_TASK, resolveTaskModel } from '@/lib/models/routing'
-import { resolveMcpWorkspaceContext } from '@/lib/mcp/access'
+import { resolveApiWorkspaceContext } from '@/lib/workspace/api-context'
 import { getWorkspace, patchWorkspace } from '@/lib/workspace/store'
 
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}))
-    const ctx = await resolveMcpWorkspaceContext(request)
+    const ctx = await resolveApiWorkspaceContext(request)
     const ws = await getWorkspace(ctx)
     const modelConfig = resolveTaskModel(MODEL_TASK.LEAD_SCORING, ws.modelRouting)
 
@@ -18,6 +19,8 @@ export async function POST(request: Request) {
         criteria: body.criteria || ws.research?.marketSummary || ws.campaign.targetAudience,
         customPromptDetails: body.customPromptDetails,
         brandProfile: ws.brandProfile,
+        research: ws.research,
+        signals: mergeCrustdataSignals({ criteria: body.criteria }, ws.brandProfile, ws.research, ws.campaign),
         modelConfig,
       }),
     )

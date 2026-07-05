@@ -8,6 +8,12 @@ import type {
   BrandProfile,
 } from '@/types'
 import { DEMO_COMPANY, demoBrandProfile } from '@/lib/demo/data'
+import {
+  crustdataPromptBlock,
+  fetchTaskContext,
+  mergeCrustdataSignals,
+  type CrustdataTaskInput,
+} from './crustdata'
 import { generateJSON, generateText } from './openai'
 import { appendCustomPrompt, normalizeCustomPromptDetails, platformsFromPromptHint } from './prompt-utils'
 import { MODEL_TASK, resolveTaskModel, type TaskModelConfig } from '@/lib/models/routing'
@@ -69,6 +75,21 @@ function taskConfig(input: { modelConfig?: TaskModelConfig }, taskType: TaskMode
   return input.modelConfig ?? resolveTaskModel(taskType)
 }
 
+type GenerateDataInput = {
+  signals?: CrustdataTaskInput
+  brandProfile?: BrandProfile
+  research?: MarketResearch | null
+}
+
+async function loadCrustdata(
+  task: TaskModelConfig['taskType'],
+  base: CrustdataTaskInput,
+  input: GenerateDataInput,
+): Promise<string> {
+  const merged = mergeCrustdataSignals(base, input.brandProfile, input.research)
+  return fetchTaskContext(task, { ...merged, ...input.signals })
+}
+
 // ─── Market research ───────────────────────────────────────────────────────
 export async function generateResearch(input: {
   industry?: string
@@ -77,6 +98,8 @@ export async function generateResearch(input: {
   offer?: string
   customPromptDetails?: string
   brandProfile?: BrandProfile
+  research?: MarketResearch | null
+  signals?: CrustdataTaskInput
   modelConfig?: TaskModelConfig
 }): Promise<MarketResearch> {
   const mc = taskConfig(input, MODEL_TASK.MARKET_RESEARCH)
@@ -85,15 +108,19 @@ export async function generateResearch(input: {
   const region = input.region || DEMO_COMPANY.region
   const offer = input.offer || input.brandProfile?.mainOffer || demoBrandProfile.mainOffer
   const brandContext = buildBrandContext(input.brandProfile, region)
+  const crustdataContext = await loadCrustdata(
+    MODEL_TASK.MARKET_RESEARCH,
+    { industry, region, targetCustomer, offer },
+    input,
+  )
 
   const data = await generateJSON<Partial<MarketResearch>>({
     model: mc.model,
     fallbackModel: mc.fallbackModel,
     temperature: mc.temperature,
     maxTokens: mc.maxTokens,
-    system: `You are a senior B2B market research analyst. Produce sharp, data-aware insights for a marketing team. Always respond with a single valid JSON object and nothing else.`,
-    user: appendCustomPrompt(`${brandContext}
-
+    system: `You are a senior B2B market research analyst. Produce sharp, data-aware insights for a marketing team. When CrustData evidence is provided, treat it as primary source material and ground competitors, trends, and gaps in that data. Always respond with a single valid JSON object and nothing else.`,
+    user: appendCustomPrompt(`${brandContext}${crustdataPromptBlock(crustdataContext, 'market data')}
 Run market research for:
 - Industry: ${industry}
 - Target customer: ${targetCustomer}
@@ -136,18 +163,25 @@ export async function generateTopics(input: {
   count?: number
   customPromptDetails?: string
   brandProfile?: BrandProfile
+  research?: MarketResearch | null
+  signals?: CrustdataTaskInput
   modelConfig?: TaskModelConfig
 }): Promise<string[]> {
   const mc = taskConfig(input, MODEL_TASK.CONTENT_GENERATION)
   const count = input.count ?? 12
   const brandContext = buildBrandContext(input.brandProfile)
+  const crustdataContext = await loadCrustdata(
+    MODEL_TASK.CONTENT_GENERATION,
+    { goal: input.goal, topic: input.goal },
+    input,
+  )
   const data = await generateJSON<{ topics?: string[] }>({
     model: mc.model,
     fallbackModel: mc.fallbackModel,
     temperature: mc.temperature,
     maxTokens: mc.maxTokens,
-    system: `You are a B2B content strategist. Respond only with a valid JSON object.`,
-    user: appendCustomPrompt(`${brandContext}
+    system: `You are a B2B content strategist. When CrustData evidence is provided, ground topic ideas in real market signals. Respond only with a valid JSON object.`,
+    user: appendCustomPrompt(`${brandContext}${crustdataPromptBlock(crustdataContext, 'content strategy data')}
 
 Campaign goal: ${input.goal || DEMO_COMPANY.goal}
 
@@ -165,6 +199,8 @@ export async function generateContentDrafts(input: {
   campaignId?: string
   customPromptDetails?: string
   brandProfile?: BrandProfile
+  research?: MarketResearch | null
+  signals?: CrustdataTaskInput
   modelConfig?: TaskModelConfig
 }): Promise<ContentDraft[]> {
   const mc = taskConfig(input, MODEL_TASK.CONTENT_GENERATION)
@@ -181,14 +217,19 @@ export async function generateContentDrafts(input: {
     normalizeCustomPromptDetails(input.customPromptDetails) ||
     profile.mainOffer ||
     DEMO_COMPANY.goal
+  const crustdataContext = await loadCrustdata(
+    MODEL_TASK.CONTENT_GENERATION,
+    { topic: topicFocus },
+    input,
+  )
 
   const data = await generateJSON<{ drafts?: Partial<ContentDraft>[] }>({
     model: mc.model,
     fallbackModel: mc.fallbackModel,
     temperature: mc.temperature,
     maxTokens: mc.maxTokens,
-    system: `You are an expert social media copywriter. Write platform-native, high-converting posts that respect the brand's tone and content rules. Respond only with a valid JSON object.`,
-    user: appendCustomPrompt(`${brandContext}
+    system: `You are an expert social media copywriter. Write platform-native, high-converting posts that respect the brand's tone and content rules. Ground claims in CrustData evidence when provided. Respond only with a valid JSON object.`,
+    user: appendCustomPrompt(`${brandContext}${crustdataPromptBlock(crustdataContext, 'content market data')}
 
 Topic / offer focus: ${topicFocus}
 Write one post for each of these platforms: ${platforms.join(', ')}.
@@ -242,19 +283,26 @@ export async function generateVideoScripts(input: {
   count?: number
   customPromptDetails?: string
   brandProfile?: BrandProfile
+  research?: MarketResearch | null
+  signals?: CrustdataTaskInput
   modelConfig?: TaskModelConfig
 }): Promise<VideoScript[]> {
   const mc = taskConfig(input, MODEL_TASK.VIDEO_SCRIPTS)
   const count = input.count ?? 3
   const brandContext = buildBrandContext(input.brandProfile)
   const profile = input.brandProfile ?? demoBrandProfile
+  const crustdataContext = await loadCrustdata(
+    MODEL_TASK.VIDEO_SCRIPTS,
+    { topic: input.topic },
+    input,
+  )
   const data = await generateJSON<{ scripts?: Partial<VideoScript>[] }>({
     model: mc.model,
     fallbackModel: mc.fallbackModel,
     temperature: mc.temperature,
     maxTokens: mc.maxTokens,
-    system: `You are a short-form video scriptwriter (Reels, Shorts, TikTok). Respond only with a valid JSON object.`,
-    user: appendCustomPrompt(`${brandContext}
+    system: `You are a short-form video scriptwriter (Reels, Shorts, TikTok). Use CrustData trend signals when provided. Respond only with a valid JSON object.`,
+    user: appendCustomPrompt(`${brandContext}${crustdataPromptBlock(crustdataContext, 'video trend data')}
 
 ${input.topic ? `Topic focus: ${input.topic}` : ''}
 Write ${count} short-form video scripts.
@@ -296,20 +344,32 @@ export async function generateLeads(input: {
   criteria?: string
   customPromptDetails?: string
   brandProfile?: BrandProfile
+  research?: MarketResearch | null
+  signals?: CrustdataTaskInput
   modelConfig?: TaskModelConfig
 }): Promise<Lead[]> {
   const mc = taskConfig(input, MODEL_TASK.LEAD_SCORING)
   const count = input.count ?? 12
   const brandContext = buildBrandContext(input.brandProfile)
   const profile = input.brandProfile ?? demoBrandProfile
+  const crustdataContext = await loadCrustdata(
+    MODEL_TASK.LEAD_SCORING,
+    {
+      criteria: input.criteria,
+      targetCustomer: profile.targetAudience,
+      count,
+    },
+    input,
+  )
   const data = await generateJSON<{ leads?: Partial<Lead>[] }>({
     model: mc.model,
     fallbackModel: mc.fallbackModel,
     temperature: mc.temperature,
     maxTokens: Math.max(mc.maxTokens, 4096),
-    system: `You are a B2B lead generation researcher. Generate realistic, plausible prospect profiles (these are illustrative examples, not real contact data). Respond only with a valid JSON object.`,
-    user: appendCustomPrompt(`${brandContext}
-
+    system: crustdataContext
+      ? `You are a B2B lead generation researcher. CrustData profiles below are real indexed people — map them into qualified leads with scores and outreach angles. Do not invent different names or companies when real profiles are provided. Respond only with a valid JSON object.`
+      : `You are a B2B lead generation researcher. Generate realistic, plausible prospect profiles (these are illustrative examples, not real contact data). Respond only with a valid JSON object.`,
+    user: appendCustomPrompt(`${brandContext}${crustdataPromptBlock(crustdataContext, 'prospect profiles')}
 ${input.criteria ? `Targeting criteria: ${input.criteria}` : ''}
 Generate ${count} qualified prospect profiles that fit the ideal customer.
 
@@ -356,17 +416,24 @@ export async function generateOutreach(input: {
   matchReason?: string
   customPromptDetails?: string
   brandProfile?: BrandProfile
+  research?: MarketResearch | null
+  signals?: CrustdataTaskInput
   modelConfig?: TaskModelConfig
 }): Promise<OutreachMessage> {
   const mc = taskConfig(input, MODEL_TASK.OUTREACH_WRITING)
   const brandContext = buildBrandContext(input.brandProfile)
+  const crustdataContext = await loadCrustdata(
+    MODEL_TASK.OUTREACH_WRITING,
+    { company: input.company, leadName: input.leadName },
+    input,
+  )
   const data = await generateJSON<Partial<OutreachMessage>>({
     model: mc.model,
     fallbackModel: mc.fallbackModel,
     temperature: mc.temperature,
     maxTokens: mc.maxTokens,
-    system: `You are an expert B2B outreach copywriter. Write warm, personalized, non-spammy messages. Respond only with a valid JSON object.`,
-    user: appendCustomPrompt(`${brandContext}
+    system: `You are an expert B2B outreach copywriter. Write warm, personalized, non-spammy messages grounded in CrustData prospect/company data when provided. Respond only with a valid JSON object.`,
+    user: appendCustomPrompt(`${brandContext}${crustdataPromptBlock(crustdataContext, 'prospect intelligence')}
 
 Prospect: ${input.leadName || 'the prospect'}${input.company ? ` at ${input.company}` : ''}
 ${input.painPoint ? `Pain point: ${input.painPoint}` : ''}
@@ -408,18 +475,25 @@ export interface SafetyResult {
 export async function checkBrandSafety(input: {
   content?: string
   brandProfile?: BrandProfile
+  research?: MarketResearch | null
+  signals?: CrustdataTaskInput
   modelConfig?: TaskModelConfig
 }): Promise<SafetyResult> {
   const mc = taskConfig(input, MODEL_TASK.BRAND_SAFETY)
   const content = input.content || ''
   const brandContext = buildBrandContext(input.brandProfile)
+  const crustdataContext = await loadCrustdata(
+    MODEL_TASK.BRAND_SAFETY,
+    { content },
+    input,
+  )
   const data = await generateJSON<Partial<SafetyResult>>({
     model: mc.model,
     fallbackModel: mc.fallbackModel,
     temperature: mc.temperature,
     maxTokens: mc.maxTokens,
-    system: `You are a brand safety and compliance reviewer. Detect risky claims, unverifiable guarantees, spammy phrasing, and off-brand language. Respond only with a valid JSON object.`,
-    user: `${brandContext}
+    system: `You are a brand safety and compliance reviewer. Detect risky claims, unverifiable guarantees, spammy phrasing, and off-brand language. Use CrustData fact-check signals when provided. Respond only with a valid JSON object.`,
+    user: `${brandContext}${crustdataPromptBlock(crustdataContext, 'fact-check data')}
 
 Review this content for brand safety and compliance:
 """
@@ -450,17 +524,24 @@ export async function generateOutput(
   customPromptDetails?: string,
   brandProfile?: BrandProfile,
   modelConfig?: TaskModelConfig,
+  research?: MarketResearch | null,
+  signals?: CrustdataTaskInput,
 ): Promise<string> {
   const mc = modelConfig ?? resolveTaskModel(MODEL_TASK.ANALYTICS_SUMMARY)
   const brandContext = buildBrandContext(brandProfile)
+  const crustdataContext = await loadCrustdata(
+    MODEL_TASK.ANALYTICS_SUMMARY,
+    { topic: taskType, goal: input },
+    { brandProfile, research, signals },
+  )
   return generateText({
     model: mc.model,
     fallbackModel: mc.fallbackModel,
     temperature: mc.temperature,
     maxTokens: mc.maxTokens,
-    system: `You are an AI marketing agent specialized in "${taskType}". ${brandContext}`,
+    system: `You are an AI marketing agent specialized in "${taskType}". Ground analysis in CrustData when provided. ${brandContext}`,
     user: appendCustomPrompt(
-      input || `Perform the "${taskType}" task and summarize the result.`,
+      `${crustdataPromptBlock(crustdataContext, 'analytics data')}${input || `Perform the "${taskType}" task and summarize the result.`}`,
       customPromptDetails,
     ),
   })

@@ -1,4 +1,5 @@
 import { randomUUID } from 'crypto'
+import { normalizePixverseVideoParams } from '@/lib/models/media-options'
 
 const PIXVERSE_BASE = 'https://app-api.pixverse.ai/openapi/v2'
 
@@ -49,7 +50,13 @@ async function pixverseFetch<T>(path: string, init?: RequestInit): Promise<T> {
 
   const data = (await res.json()) as PixverseResponse<T>
   if (data.ErrCode !== 0) {
-    throw new Error(data.ErrMsg || `PixVerse error ${data.ErrCode}`)
+    const msg = data.ErrMsg || `PixVerse error ${data.ErrCode}`
+    if (/invalid parameter/i.test(msg)) {
+      throw new Error(
+        `${msg} — check duration (5 or 8s; v6 also allows 10/15s), quality (1080p requires 5s only), and model.`,
+      )
+    }
+    throw new Error(msg)
   }
   return data.Resp
 }
@@ -61,15 +68,23 @@ export async function submitTextToVideo(input: {
   quality?: PixverseQuality
   aspectRatio?: PixverseAspectRatio
 }): Promise<number> {
+  const model = (input.model || process.env.PIXVERSE_MODEL || 'v4.5') as PixverseModel
+  const { duration, quality } = normalizePixverseVideoParams({
+    model,
+    duration: input.duration ?? 5,
+    quality: input.quality || '540p',
+  })
+
   const resp = await pixverseFetch<VideoSubmitResp>('/video/text/generate', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({
       prompt: input.prompt.slice(0, 5000),
-      model: input.model || process.env.PIXVERSE_MODEL || 'v4.5',
-      duration: input.duration ?? 5,
-      quality: input.quality || '540p',
+      model,
+      duration,
+      quality,
       aspect_ratio: input.aspectRatio || '16:9',
+      motion_mode: 'normal',
     }),
   })
   return resp.video_id

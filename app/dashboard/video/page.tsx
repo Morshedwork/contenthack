@@ -16,9 +16,9 @@ import type { GeneratedVideo, VideoScript } from '@/types'
 import type { PixverseModel, PixverseQuality } from '@/lib/ai/pixverse'
 import {
   VIDEO_ASPECT_RATIOS,
-  VIDEO_DURATIONS,
   VIDEO_MODELS,
   VIDEO_QUALITIES,
+  getVideoDurationsForModel,
   type VideoDurationSec,
 } from '@/lib/models/media-options'
 import { Archive, Copy, Film, Loader2, Send, Sparkles, Clock, Play } from 'lucide-react'
@@ -41,11 +41,32 @@ export default function VideoStudioPage() {
   const [studioTab, setStudioTab] = useState('scripts')
   const [latestVideo, setLatestVideo] = useState<GeneratedVideo | null>(null)
 
+  const durationOptions = getVideoDurationsForModel(videoModel)
+
   useEffect(() => {
     if (data?.videoScripts) setScripts(data.videoScripts)
     if (data?.generatedVideos) setVideos(data.generatedVideos)
     if (data?.topics[0]?.title && !topic) setTopic(data.topics[0].title)
   }, [data, topic])
+
+  useEffect(() => {
+    if (!durationOptions.includes(videoDuration)) {
+      setVideoDuration(durationOptions[0])
+    }
+    if (videoQuality === '1080p' && videoDuration === 8) {
+      setVideoDuration(5)
+    }
+  }, [videoModel, videoQuality, videoDuration, durationOptions])
+
+  useEffect(() => {
+    void fetch('/api/media/providers')
+      .then((r) => r.json())
+      .then((json) => {
+        if (!json.success || !json.data.defaultVideoModel) return
+        setVideoModel(json.data.defaultVideoModel)
+      })
+      .catch(() => {})
+  }, [])
 
   const script = scripts[0]
 
@@ -99,6 +120,9 @@ export default function VideoStudioPage() {
       setLatestVideo(json.data.video)
       setVideos(json.data.videos)
       await refresh()
+      if (json.data.warnings?.length) {
+        json.data.warnings.forEach((w: string) => toast.warning(w))
+      }
       toast.success(
         json.data.live
           ? `Video generated with PixVerse ${videoModel}`
@@ -184,7 +208,7 @@ export default function VideoStudioPage() {
                     >
                       <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        {VIDEO_DURATIONS.map((sec) => (
+                        {durationOptions.map((sec) => (
                           <SelectItem key={sec} value={String(sec)}>
                             {sec} seconds
                           </SelectItem>
@@ -229,7 +253,9 @@ export default function VideoStudioPage() {
                 </div>
                 <p className="text-[11px] text-muted-foreground -mt-1">
                   {VIDEO_MODELS.find((m) => m.id === videoModel)?.description}
-                  {videoModel === 'v6' ? ' · v6 supports up to 15s at 1080p.' : ''}
+                  {videoModel === 'v6'
+                    ? ' · v6 supports 5–15s. 1080p is limited to 5s.'
+                    : ' · v4.5–v5.5 support 5s or 8s only. 1080p requires 5s.'}
                 </p>
               </div>
               <BrandThemeReferenceSelect

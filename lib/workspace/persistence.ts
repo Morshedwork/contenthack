@@ -35,21 +35,23 @@ export async function loadWorkspaceState(workspaceId: string): Promise<Workspace
 export async function saveWorkspaceState(workspaceId: string, state: WorkspaceState): Promise<void> {
   if (isDemoMode()) return
 
-  try {
-    const admin = createAdminClient()
-    const { error } = await admin.from('workspace_state').upsert(
-      {
-        workspace_id: workspaceId,
-        state: state as unknown as Record<string, unknown>,
-        updated_at: new Date().toISOString(),
-      },
-      { onConflict: 'workspace_id' },
+  if (!hasSupabasePersistence()) {
+    throw new Error(
+      'SUPABASE_SERVICE_ROLE_KEY is required to save workspace data. Add it to your server environment (e.g. Vercel) and run supabase/schema.sql.',
     )
+  }
 
-    if (error) {
-      console.warn('[workspace] save failed (using in-memory state):', error.message)
-    }
-  } catch (err) {
-    console.warn('[workspace] save error (using in-memory state):', err)
+  const admin = createAdminClient()
+  const { error } = await admin.from('workspace_state').upsert(
+    {
+      workspace_id: workspaceId,
+      state: state as unknown as Record<string, unknown>,
+      updated_at: new Date().toISOString(),
+    },
+    { onConflict: 'workspace_id' },
+  )
+
+  if (error) {
+    throw new Error(`Failed to save workspace: ${error.message}`)
   }
 }

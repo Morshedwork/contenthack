@@ -8,6 +8,7 @@ import { ScrollArea } from '@/components/ui/scroll-area'
 import { cn } from '@/lib/utils'
 import { ViewGenerationButtons } from '@/components/agents/view-generation-buttons'
 import { sendChatMessage, type ChatActionExecuted, type ChatMessage, type ChatMode } from '@/lib/agents/client'
+import { useWorkspace } from '@/hooks/use-workspace'
 import {
   AGENT_SUGGESTED_PROMPTS,
   BASIC_SUGGESTED_PROMPTS,
@@ -128,6 +129,7 @@ function ChatModeToggle({
 }
 
 export function AgentChat({ variant = 'page', className }: AgentChatProps) {
+  const { refresh } = useWorkspace()
   const [chatMode, setChatMode] = useState<ChatMode>('basic')
   const [messages, setMessages] = useState<EnrichedChatMessage[]>([
     {
@@ -179,7 +181,8 @@ export function AgentChat({ variant = 'page', className }: AgentChatProps) {
         chatMode === 'agent' &&
         result.actionsExecuted.some((a) => a.type === 'run_agent' || a.type === 'run_workflow')
       ) {
-        toast.success(result.live ? 'Agents completed (OpenAI)' : 'Agents completed (demo mode)')
+        await refresh()
+        toast.success(result.live ? 'Agents completed — workspace saved' : 'Agents completed (demo mode)')
       }
     } catch (err) {
       const errorMsg = err instanceof Error ? err.message : 'Something went wrong'
