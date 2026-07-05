@@ -3,7 +3,7 @@
 import Link from 'next/link'
 import { usePathname, useRouter } from 'next/navigation'
 import { createClient } from '@/lib/supabase/client'
-import { Suspense, useState } from 'react'
+import { Suspense, useCallback, useEffect, useState } from 'react'
 import { cn } from '@/lib/utils'
 import { Button } from '@/components/ui/button'
 import { Badge } from '@/components/ui/badge'
@@ -30,6 +30,8 @@ import {
   LogOut,
   Menu,
   MessageSquare,
+  PanelLeft,
+  PanelLeftClose,
   Search,
   Sparkles,
   Zap,
@@ -37,7 +39,7 @@ import {
 } from 'lucide-react'
 import { Sheet, SheetContent, SheetTitle, SheetTrigger } from '@/components/ui/sheet'
 import { isDemoMode } from '@/lib/demo/mode'
-import { AgentChat } from '@/components/agents/agent-chat'
+import { AssistantWidget } from '@/components/assistant/assistant-widget'
 import { CommandPalette, useCommandPalette } from '@/components/dashboard/command-palette'
 import { DashboardDemoTour } from '@/components/demo/dashboard-demo-tour'
 import { QuickDemoAutoLoad } from '@/components/demo/quick-demo-auto-load'
@@ -50,17 +52,22 @@ interface DashboardShellProps {
   children: React.ReactNode
 }
 
+const SIDEBAR_STORAGE_KEY = 'contentops-dashboard-sidebar-open'
+
 export function DashboardShell({ user, children }: DashboardShellProps) {
   const router = useRouter()
   const pathname = usePathname()
   const [signingOut, setSigningOut] = useState(false)
   const [mobileOpen, setMobileOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
+  const [sidebarOpen, setSidebarOpen] = useState(true)
   const { open: cmdOpen, setOpen: setCmdOpen } = useCommandPalette()
   const demo = isDemoMode()
   const displayName = user.user_metadata?.full_name || user.email || 'Demo User'
   const initial = displayName[0]?.toUpperCase() ?? 'D'
   const pageMeta = getPageMeta(pathname)
+  const isAssistantPage =
+    pathname === '/dashboard/chat' || pathname === '/dashboard/voice'
 
   const handleSignOut = async () => {
     if (demo) {
@@ -76,6 +83,35 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
 
   const isActive = (href: string) =>
     href === '/dashboard' ? pathname === '/dashboard' : pathname.startsWith(href)
+
+  useEffect(() => {
+    const stored = localStorage.getItem(SIDEBAR_STORAGE_KEY)
+    if (stored !== null) setSidebarOpen(stored === 'true')
+  }, [])
+
+  const toggleSidebar = useCallback(() => {
+    setSidebarOpen((open) => {
+      const next = !open
+      localStorage.setItem(SIDEBAR_STORAGE_KEY, String(next))
+      return next
+    })
+  }, [])
+
+  useEffect(() => {
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key.toLowerCase() !== 'b' || !(event.metaKey || event.ctrlKey)) return
+      const target = event.target as HTMLElement | null
+      if (
+        target?.closest('input, textarea, select, [contenteditable="true"]')
+      ) {
+        return
+      }
+      event.preventDefault()
+      toggleSidebar()
+    }
+    window.addEventListener('keydown', onKeyDown)
+    return () => window.removeEventListener('keydown', onKeyDown)
+  }, [toggleSidebar])
 
   const SidebarBody = ({ onNavigate }: { onNavigate?: () => void }) => (
     <>
@@ -197,23 +233,42 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
     <div className="min-h-screen flex dashboard-mesh">
       <CommandPalette open={cmdOpen} onOpenChange={setCmdOpen} />
 
-      <aside className="hidden lg:flex w-[280px] flex-col border-r border-sidebar-border bg-sidebar/90 backdrop-blur-xl shrink-0">
+      <aside
+        className={cn(
+          'hidden lg:flex w-[280px] flex-col border-r border-sidebar-border bg-sidebar/90 backdrop-blur-xl shrink-0',
+          !sidebarOpen && 'lg:hidden',
+        )}
+      >
         <SidebarBody />
       </aside>
 
       <div className="flex-1 flex flex-col min-w-0">
         <header className="h-16 border-b border-border/50 bg-background/70 backdrop-blur-xl sticky top-0 z-40 flex items-center px-5 lg:px-6 gap-4">
-          <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
-            <SheetTrigger asChild className="lg:hidden">
-              <Button variant="ghost" size="icon" className="shrink-0">
-                <Menu />
-              </Button>
-            </SheetTrigger>
-            <SheetContent side="left" className="w-72 p-0 bg-sidebar flex flex-col">
-              <SheetTitle className="sr-only">Navigation</SheetTitle>
-              <SidebarBody onNavigate={() => setMobileOpen(false)} />
-            </SheetContent>
-          </Sheet>
+          <div className="flex items-center gap-1 shrink-0">
+            <Sheet open={mobileOpen} onOpenChange={setMobileOpen}>
+              <SheetTrigger asChild className="lg:hidden">
+                <Button variant="ghost" size="icon">
+                  <Menu />
+                </Button>
+              </SheetTrigger>
+              <SheetContent side="left" className="w-72 p-0 bg-sidebar flex flex-col">
+                <SheetTitle className="sr-only">Navigation</SheetTitle>
+                <SidebarBody onNavigate={() => setMobileOpen(false)} />
+              </SheetContent>
+            </Sheet>
+
+            <Button
+              type="button"
+              variant="ghost"
+              size="icon"
+              className="hidden lg:inline-flex"
+              onClick={toggleSidebar}
+              aria-label={sidebarOpen ? 'Hide sidebar' : 'Show sidebar'}
+              title={sidebarOpen ? 'Hide sidebar (Ctrl+B)' : 'Show sidebar (Ctrl+B)'}
+            >
+              {sidebarOpen ? <PanelLeftClose className="size-4" /> : <PanelLeft className="size-4" />}
+            </Button>
+          </div>
 
           {/* Page context */}
           <div className="hidden sm:flex flex-col min-w-0 mr-1">
@@ -320,41 +375,55 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
           </DropdownMenu>
         </header>
 
-        <main className="flex-1 overflow-auto p-5 lg:p-7">
+        <main
+          className={cn(
+            'flex-1',
+            isAssistantPage
+              ? 'flex min-h-0 flex-col overflow-hidden p-3 sm:p-4 lg:p-5'
+              : 'overflow-auto p-5 lg:p-7',
+          )}
+        >
           <Suspense fallback={null}>
             <QuickDemoAutoLoad />
           </Suspense>
           <DashboardDemoTour />
-          <div key={pathname} className="content-enter max-w-[1600px] mx-auto w-full">
+          <div
+            className={cn(
+              'content-enter mx-auto w-full',
+              isAssistantPage
+                ? 'flex min-h-0 flex-1 flex-col'
+                : 'max-w-[1600px]',
+            )}
+          >
             {children}
           </div>
         </main>
       </div>
 
-      {pathname !== '/dashboard/chat' && (
+      {!isAssistantPage && (
         <Sheet open={chatOpen} onOpenChange={setChatOpen}>
           <SheetTrigger asChild>
             <Button
               size="lg"
               className="fixed bottom-5 right-5 z-50 size-12 rounded-2xl shadow-xl shadow-violet-500/30 bg-gradient-to-br from-violet-500 to-blue-500 hover:from-violet-600 hover:to-blue-600 hover:scale-105 active:scale-95 p-0 border border-white/10 transition-transform duration-300 ease-out"
-              aria-label="Open AI Chat"
+              aria-label="Open AI Assistant"
             >
               <MessageSquare className="size-5 text-white" />
             </Button>
           </SheetTrigger>
           <SheetContent side="right" className="w-full sm:max-w-md p-0 flex flex-col border-l border-violet-500/20">
-            <SheetTitle className="sr-only">AI Chat</SheetTitle>
+            <SheetTitle className="sr-only">AI Assistant</SheetTitle>
             <div className="px-5 pt-5 pb-4 border-b border-border/60 shrink-0 bg-gradient-to-r from-violet-500/10 to-transparent">
               <h2 className="font-display text-xl flex items-center gap-2.5">
                 <Bot className="size-5 text-violet-300" />
-                AI Chat
+                AI Assistant
               </h2>
               <p className="text-sm text-muted-foreground mt-1">
-                Basic chat or agent mode for your pipeline
+                Switch between text chat and live voice
               </p>
             </div>
             <div className="flex-1 min-h-0 p-4">
-              <AgentChat variant="widget" className="h-full" />
+              <AssistantWidget className="h-full" />
             </div>
           </SheetContent>
         </Sheet>

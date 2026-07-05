@@ -11,6 +11,8 @@ export async function POST(request: Request) {
     const { agent, live } = await runAgentTask(agentId, {
       customPromptDetails: body.customPromptDetails,
       url: body.url,
+      videoContext: body.videoContext,
+      reviewVideoScripts: body.reviewVideoScripts === true,
       ...resolveAgentWorkspaceOptions(request),
     })
     return apiSuccess({ agent, live })

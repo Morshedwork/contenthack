@@ -4,7 +4,7 @@ const BASIC_CHAT_WELCOME =
   "Hi! I'm in **Basic Chat** mode — ask me anything about content marketing, copywriting, or strategy. I won't run agents here; switch to **Agent Mode** when you want to execute your pipeline."
 
 const AGENT_CHAT_WELCOME =
-  "Hi! I'm your ContentOps AI assistant. Tell me what you need in plain language — I'll run the right agents for you.\n\nTry: **\"Research the Japan SME market and generate LinkedIn posts\"** or **\"Run the full workflow\"**"
+  "I'm your **autonomous ContentOps agent** — tell me the outcome you want and I'll plan, run the right agents, and show you live progress.\n\nTry: **\"Research Japan SMEs and draft LinkedIn posts\"** · **\"Launch the full campaign pipeline\"** · **\"Find leads and draft outreach\"**"
 
 export function getChatWelcomeMessage(mode: ChatMode): string {
   return mode === 'basic' ? BASIC_CHAT_WELCOME : AGENT_CHAT_WELCOME

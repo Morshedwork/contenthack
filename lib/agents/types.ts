@@ -15,11 +15,78 @@ export interface ChatActionExecuted {
   estimatedTimeSaved?: string
 }
 
+export type ChatArtifactType =
+  | 'post'
+  | 'image'
+  | 'video'
+  | 'script'
+  | 'topic'
+  | 'research'
+  | 'lead'
+  | 'outreach'
+
+/** Rich preview of something created or updated during a chat turn. */
+export interface ChatArtifact {
+  id: string
+  type: ChatArtifactType
+  title: string
+  preview?: string
+  agentId?: string
+  href: string
+  thumbnailUrl?: string
+  mediaUrl?: string
+  meta?: string
+}
+
+/** Dashboard link the assistant can cite so users know where edits landed. */
+export interface ChatReference {
+  label: string
+  href: string
+  description?: string
+}
+
+/** Contextual follow-up the user can tap to continue the workflow. */
+export interface ChatSuggestedAction {
+  label: string
+  prompt: string
+}
+
+export type ChatPlanStepStatus = 'pending' | 'running' | 'completed' | 'failed' | 'skipped'
+
+/** One step in an autonomous agent execution plan. */
+export interface ChatPlanStep {
+  id: string
+  agentId: string
+  agentName: string
+  label: string
+  href?: string
+  status: ChatPlanStepStatus
+  output?: string
+}
+
+/** Visible plan the orchestrator executes — shown live in chat. */
+export interface ChatAgentPlan {
+  goal: string
+  reasoning: string
+  steps: ChatPlanStep[]
+}
+
+export type ChatStreamEvent =
+  | { type: 'plan'; plan: ChatAgentPlan }
+  | { type: 'step'; agentId: string; status: ChatPlanStepStatus; output?: string }
+  | { type: 'summarizing' }
+  | { type: 'done'; response: ChatResponse }
+  | { type: 'error'; message: string }
+
 export interface ChatResponse {
   message: string
   actionsExecuted: ChatActionExecuted[]
   agents: AgentDefinition[]
   live: boolean
+  artifacts?: ChatArtifact[]
+  references?: ChatReference[]
+  suggestedActions?: ChatSuggestedAction[]
+  plan?: ChatAgentPlan
 }
 
 /** A single KPI tile inside a Voice Manager briefing. */

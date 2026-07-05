@@ -366,13 +366,12 @@ export const investorPitchTourSteps = [
   { step: 3, label: 'Research', href: '/dashboard/research', blurb: 'Market trends and competitor gaps' },
   { step: 4, label: 'Content', href: '/dashboard/content', blurb: 'Social posts and content topics' },
   { step: 5, label: 'Video', href: '/dashboard/video', blurb: 'Short-form video scripts for social' },
-  { step: 6, label: 'Approval', href: '/dashboard/approval', blurb: 'Human-in-the-loop before publish' },
+  { step: 6, label: 'Approve & Publish', href: '/dashboard/approval', blurb: 'Review, approve, and publish to platforms' },
   { step: 7, label: 'Calendar', href: '/dashboard/calendar', blurb: 'Cross-platform content schedule' },
-  { step: 8, label: 'Publishing', href: '/dashboard/publishing', blurb: 'Multi-platform publish logs' },
-  { step: 9, label: 'Leads', href: '/dashboard/leads', blurb: 'Prospects scored for outreach' },
-  { step: 10, label: 'Outreach', href: '/dashboard/outreach', blurb: 'Personalized sales messages' },
-  { step: 11, label: 'Analytics', href: '/dashboard/analytics', blurb: 'Marketing and sales ROI' },
-  { step: 12, label: 'Impact', href: '/dashboard/impact-report', blurb: 'Before/after results summary' },
+  { step: 8, label: 'Leads', href: '/dashboard/leads', blurb: 'Prospects scored for outreach' },
+  { step: 9, label: 'Outreach', href: '/dashboard/outreach', blurb: 'Personalized sales messages' },
+  { step: 10, label: 'Analytics', href: '/dashboard/analytics', blurb: 'Marketing and sales ROI' },
+  { step: 11, label: 'Impact', href: '/dashboard/impact-report', blurb: 'Before/after results summary' },
 ] as const
 
 export function isInvestorPitchCampaign(campaignId: string): boolean {

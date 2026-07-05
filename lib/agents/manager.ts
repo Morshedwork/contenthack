@@ -26,7 +26,8 @@ import { hasElevenLabs } from '@/lib/ai/elevenlabs'
 import { hasKimi, KIMI_MODEL } from '@/lib/ai/kimi'
 import { generateJSON, hasTextAI } from '@/lib/ai/layer'
 import { hasOpenAI, OPENAI_MODEL, OPENAI_MODEL_QUALITY } from '@/lib/ai/openai'
-import { MODEL_TASK } from '@/lib/models/routing'
+import { MODEL_TASK, resolveTaskModel } from '@/lib/models/routing'
+import { voiceLanguageInstruction } from '@/lib/voice/languages'
 import { resolveWorkspaceContext } from '@/lib/workspace/context'
 import { computeDynamicROI, getWorkspace, type WorkspaceState } from '@/lib/workspace/store'
 
@@ -39,6 +40,42 @@ function buildStack(crustdataUsed: boolean): ManagerStack {
     gStack: [...new Set(gStack)],
     crustdata: crustdataUsed,
     voice: hasElevenLabs(),
+  }
+}
+
+function stripMarkdown(text: string): string {
+  return text.replace(/\*\*/g, '').replace(/[#*_`]/g, '').trim()
+}
+
+function ranAgentWork(actions: ChatActionExecuted[]): boolean {
+  return actions.some((a) => a.type === 'run_agent' || a.type === 'run_workflow')
+}
+
+function needsFullBriefing(transcript: string, actions: ChatActionExecuted[]): boolean {
+  if (ranAgentWork(actions)) return true
+  if (actions.some((a) => a.type === 'status')) return true
+  return /\b(brief|analysis|analyze|research|market|competitive|competitor|insight|report|status|update me|how (are|is) (we|the campaign|my)|pipeline|metrics|roi)\b/i.test(
+    transcript,
+  )
+}
+
+function spokenFromMessage(message: string): string {
+  const plain = stripMarkdown(message)
+  return plain.replace(/\n+/g, ' ').trim()
+}
+
+function buildConversationalBriefing(ws: WorkspaceState, message: string): ManagerBriefing {
+  const spoken = spokenFromMessage(message)
+  const headline = spoken.split(/[.!?]/)[0]?.trim() || spoken.slice(0, 80)
+  return {
+    headline,
+    spokenSummary: spoken,
+    metrics: buildMetrics(ws),
+    insights: [],
+    recommendations: [],
+    competitiveEdge: [],
+    stack: buildStack(false),
+    generatedAt: new Date().toISOString(),
   }
 }
 
@@ -164,16 +201,28 @@ async function generateBriefing(
   ws: WorkspaceState,
   actions: ChatActionExecuted[],
   crustdataContext: string,
+  language?: string,
 ): Promise<GeneratedBriefing> {
   const fallback = fallbackBriefing(ws, actions, crustdataContext)
   if (!hasTextAI()) return fallback
 
+  const langInstruction = voiceLanguageInstruction(language)
+
+  const briefingModel = resolveTaskModel(
+    crustdataContext ? MODEL_TASK.ANALYTICS_SUMMARY : MODEL_TASK.CONTENT_GENERATION,
+    ws.modelRouting,
+  )
+
   try {
     const result = await generateJSON<Partial<GeneratedBriefing>>({
-      model: OPENAI_MODEL,
-      temperature: 0.4,
-      maxTokens: 1200,
+      model: briefingModel.model,
+      fallbackModel: briefingModel.fallbackModel,
+      modelChain: briefingModel.modelChain,
+      temperature: 0.35,
+      maxTokens: 700,
       system: `You are the G-Brain Voice Manager — the executive AI running a content operations team of 11 agents. You just executed a voice command and must deliver a manager-grade briefing.
+
+Language: ${langInstruction}
 
 Return JSON:
 {
@@ -223,13 +272,30 @@ Rules:
 export async function handleVoiceCommand(
   transcript: string,
   history: ChatMessage[] = [],
-  options?: { allowAnonymous?: boolean },
+  options?: { allowAnonymous?: boolean; language?: string },
 ): Promise<VoiceCommandResponse> {
+  if (!hasTextAI()) {
+    throw new Error(
+      'Voice commands need a trained AI model. Add OPENAI_API_KEY and/or KIMI_API_KEY to .env.local, then restart the dev server.',
+    )
+  }
+
   const messages: ChatMessage[] = [...history.slice(-8), { role: 'user', content: transcript }]
-  const chat = await handleAgentChat(messages, options)
+  const chat = await handleAgentChat(messages, {
+    allowAnonymous: options?.allowAnonymous,
+    language: options?.language,
+  })
 
   const ctx = await resolveWorkspaceContext({ allowAnonymous: options?.allowAnonymous })
   const ws = await getWorkspace(ctx)
+
+  // Casual chat / greetings — skip CrustData + second LLM briefing for speed.
+  if (!needsFullBriefing(transcript, chat.actionsExecuted)) {
+    return {
+      ...chat,
+      briefing: buildConversationalBriefing(ws, chat.message),
+    }
+  }
 
   let crustdataContext = ''
   if (hasCrustdata()) {
@@ -245,6 +311,7 @@ export async function handleVoiceCommand(
     ws,
     chat.actionsExecuted,
     crustdataContext,
+    options?.language,
   )
 
   const briefing: ManagerBriefing = {

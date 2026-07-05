@@ -1,11 +1,15 @@
 import 'server-only'
 
+import { ttsModelForLanguage } from '@/lib/voice/languages'
+
 /**
  * ElevenLabs voice layer — gives the G-Brain Voice Manager its voice.
  *
  * - ELEVENLABS_API_KEY   → enables real neural TTS
  * - ELEVENLABS_VOICE_ID  → optional voice override (defaults to "Rachel")
  * - ELEVENLABS_MODEL     → optional model override (defaults to eleven_turbo_v2_5)
+ * - ELEVENLABS_MULTILINGUAL_MODEL → optional model for Japanese (eleven_multilingual_v2)
+ * - ELEVENLABS_BENGALI_MODEL → optional model for Bangla (eleven_v3_conversational)
  */
 const ELEVENLABS_BASE = 'https://api.elevenlabs.io/v1'
 
@@ -31,6 +35,8 @@ export function elevenLabsModel(): string {
 
 export interface SpeechOptions {
   voiceId?: string
+  /** ISO language code — picks multilingual TTS model when not English. */
+  language?: string
   /** 0–1: lower = more expressive, higher = more stable. */
   stability?: number
   /** 0–1: how closely output matches the original voice. */
@@ -57,7 +63,7 @@ export async function textToSpeech(text: string, options: SpeechOptions = {}): P
     },
     body: JSON.stringify({
       text: trimmed.slice(0, 4800),
-      model_id: elevenLabsModel(),
+      model_id: options.language ? ttsModelForLanguage(options.language) : elevenLabsModel(),
       voice_settings: {
         stability: options.stability ?? 0.45,
         similarity_boost: options.similarityBoost ?? 0.8,

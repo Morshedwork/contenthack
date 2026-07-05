@@ -1,32 +1,28 @@
 'use client'
 
 import { useCallback, useEffect, useRef, useState } from 'react'
-import { Badge } from '@/components/ui/badge'
+import { AnimatePresence, motion } from 'framer-motion'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
-import { Textarea } from '@/components/ui/textarea'
-import { ViewGenerationButtons } from '@/components/agents/view-generation-buttons'
+import {
+  DataPipelineFlow,
+  pipelineStageForStatus,
+} from '@/components/voice/data-pipeline-flow'
+import { LiveWorkspaceRail } from '@/components/voice/live-workspace-rail'
+import { VoiceLiveStage } from '@/components/voice/voice-live-stage'
+import { VoiceLanguageSelect } from '@/components/voice/voice-language-select'
+import type { VoiceOrbStatus } from '@/components/voice/voice-orb'
+import { useVoiceLanguage } from '@/hooks/use-voice-language'
 import { useWorkspace } from '@/hooks/use-workspace'
+import type { WorkspacePayload } from '@/lib/workspace/client'
 import type { ChatActionExecuted, ChatMessage, ManagerBriefing } from '@/lib/agents/types'
 import { cn } from '@/lib/utils'
 import {
-  AudioLines,
   Bot,
-  Brain,
-  Database,
-  Layers,
-  Lightbulb,
   Loader2,
-  Mic,
-  Radio,
   Send,
-  Sparkles,
-  Square,
-  Swords,
-  Target,
-  User,
   Volume2,
-  VolumeX,
 } from 'lucide-react'
 import { toast } from 'sonner'
 
@@ -65,7 +61,7 @@ function getSpeechRecognition(): SpeechRecognitionLike | null {
 /* Types                                                              */
 /* ------------------------------------------------------------------ */
 
-type ManagerStatus = 'idle' | 'listening' | 'transcribing' | 'executing' | 'speaking'
+type ManagerStatus = VoiceOrbStatus
 
 interface VoiceMessage extends ChatMessage {
   actionsExecuted?: ChatActionExecuted[]
@@ -74,177 +70,73 @@ interface VoiceMessage extends ChatMessage {
 
 interface VoiceStatus {
   voice: { enabled: boolean; model: string | null }
+  agent?: { enabled: boolean; configured: boolean; agentId: string | null }
   transcription: string | null
   gBrain: boolean
   gStack: string[]
   crustdata: boolean
 }
 
-const STATUS_COPY: Record<ManagerStatus, string> = {
-  idle: 'Standing by — tap the mic and give me an order',
-  listening: 'Listening…',
-  transcribing: 'Transcribing your command…',
-  executing: 'On it — running the agents you asked for…',
-  speaking: 'Briefing you… (tap the orb to interrupt)',
+type VoiceMode = 'commands' | 'agent'
+
+function buildWelcome(data: WorkspacePayload | null): string {
+  const hour = new Date().getHours()
+  const greet = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  if (!data) return `${greet}. Tap the mic when you're ready.`
+  const name = data.campaign.companyName || 'your campaign'
+  return `${greet}. ${name} — ${data.contentDrafts.length} drafts, ${data.leads.length} leads.`
 }
 
-const SUGGESTED_COMMANDS = [
-  'Run the full workflow and brief me on the results',
-  'Research the market and give me a competitive analysis',
-  'Generate LinkedIn posts about our main offer',
-  'Find qualified leads and draft outreach',
-  'Give me a full status report with recommendations',
+const QUICK_COMMANDS = [
+  { label: 'Full workflow', cmd: 'Run the full workflow and brief me' },
+  { label: 'Research', cmd: 'Run market research' },
+  { label: 'Posts', cmd: 'Generate LinkedIn posts' },
+  { label: 'Leads', cmd: 'Find leads and draft outreach' },
 ] as const
 
-const WELCOME: VoiceMessage = {
-  role: 'assistant',
-  content:
-    "I'm your Voice Manager — the G-Brain orchestrator. Tell me one task at a time (research, posts, leads, outreach) and I'll run only the agents you need. Say \"run the full workflow\" when you want every agent end-to-end.",
-}
-
-/* ------------------------------------------------------------------ */
-/* Small pieces                                                       */
-/* ------------------------------------------------------------------ */
-
-function PillarChip({
-  icon: Icon,
-  label,
-  active,
-  detail,
+function BriefingPanel({
+  briefing,
+  onListen,
+  listening,
 }: {
-  icon: typeof Brain
-  label: string
-  active: boolean
-  detail: string
+  briefing: ManagerBriefing
+  onListen: () => void
+  listening: boolean
 }) {
   return (
-    <div
-      title={detail}
-      className={cn(
-        'flex items-center gap-2 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors',
-        active
-          ? 'border-violet-500/40 bg-violet-500/10 text-violet-200'
-          : 'border-border/60 bg-secondary/30 text-muted-foreground',
-      )}
+    <motion.div
+      className="flex flex-col gap-6"
+      initial={{ opacity: 0, y: 8 }}
+      animate={{ opacity: 1, y: 0 }}
     >
-      <Icon className="size-3.5" />
-      {label}
-      <span className={cn('size-1.5 rounded-full', active ? 'bg-emerald-400' : 'bg-muted-foreground/40')} />
-    </div>
-  )
-}
-
-function VoiceOrb({ status, onClick }: { status: ManagerStatus; onClick: () => void }) {
-  const busy = status === 'transcribing' || status === 'executing'
-  const listening = status === 'listening'
-  const speaking = status === 'speaking'
-
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      disabled={busy}
-      aria-label={listening ? 'Stop listening' : 'Start voice command'}
-      className="relative flex size-24 items-center justify-center rounded-full outline-none disabled:cursor-wait"
-    >
-      {(listening || speaking) && (
-        <>
-          <span className="absolute inset-0 rounded-full bg-violet-500/25 animate-ping" />
-          <span className="absolute -inset-2 rounded-full bg-violet-500/15 animate-pulse" />
-        </>
-      )}
-      <span
-        className={cn(
-          'relative flex size-20 items-center justify-center rounded-full border transition-all duration-300 shadow-xl',
-          listening
-            ? 'bg-gradient-to-br from-rose-500 to-violet-600 border-rose-300/40 shadow-rose-500/40 scale-105'
-            : speaking
-              ? 'bg-gradient-to-br from-emerald-500 to-blue-600 border-emerald-300/40 shadow-emerald-500/30'
-              : 'bg-gradient-to-br from-violet-500 to-blue-600 border-white/15 shadow-violet-500/40 hover:scale-105',
-        )}
-      >
-        {busy ? (
-          <Loader2 className="size-8 text-white animate-spin" />
-        ) : listening ? (
-          <Square className="size-7 text-white fill-white" />
-        ) : speaking ? (
-          <AudioLines className="size-8 text-white" />
-        ) : (
-          <Mic className="size-8 text-white" />
-        )}
-      </span>
-    </button>
-  )
-}
-
-function BriefingPanel({ briefing }: { briefing: ManagerBriefing }) {
-  return (
-    <div className="flex flex-col gap-5">
       <div>
-        <p className="label-caps mb-1.5">Manager Briefing</p>
-        <h3 className="font-display text-lg leading-snug">{briefing.headline}</h3>
-        <p className="text-xs text-muted-foreground mt-1">
-          {new Date(briefing.generatedAt).toLocaleTimeString()} · voiced by{' '}
-          {briefing.stack.voice ? 'ElevenLabs' : 'browser TTS'}
-        </p>
+        <h3 className="font-display text-2xl sm:text-3xl leading-tight">{briefing.headline}</h3>
       </div>
 
-      <div className="grid grid-cols-2 gap-2.5">
+      <div className="grid grid-cols-2 gap-3">
         {briefing.metrics.map((m) => (
-          <div key={m.label} className="rounded-xl border border-border/60 bg-secondary/30 p-3">
-            <p className="text-xl font-semibold leading-none">{m.value}</p>
-            <p className="text-xs font-medium mt-1.5">{m.label}</p>
-            <p className="text-[10px] text-muted-foreground mt-0.5">{m.detail}</p>
+          <div key={m.label} className="rounded-2xl border border-border/50 bg-secondary/30 p-4 text-center">
+            <p className="text-3xl font-semibold tabular-nums font-display leading-none">{m.value}</p>
+            <p className="text-sm text-muted-foreground mt-2">{m.label}</p>
           </div>
         ))}
       </div>
 
-      <section>
-        <p className="flex items-center gap-1.5 text-xs font-semibold mb-2 text-violet-300">
-          <Lightbulb className="size-3.5" /> Insights
-        </p>
-        <ul className="space-y-1.5">
-          {briefing.insights.map((line, i) => (
-            <li key={i} className="text-xs text-muted-foreground leading-relaxed pl-3 border-l border-violet-500/30">
-              {line}
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section>
-        <p className="flex items-center gap-1.5 text-xs font-semibold mb-2 text-emerald-300">
-          <Target className="size-3.5" /> Recommended next moves
-        </p>
-        <ul className="space-y-1.5">
-          {briefing.recommendations.map((line, i) => (
-            <li key={i} className="text-xs text-muted-foreground leading-relaxed pl-3 border-l border-emerald-500/30">
-              {line}
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      <section>
-        <p className="flex items-center gap-1.5 text-xs font-semibold mb-2 text-amber-300">
-          <Swords className="size-3.5" /> Competitive edge · CrustData
-        </p>
-        <ul className="space-y-1.5">
-          {briefing.competitiveEdge.map((line, i) => (
-            <li key={i} className="text-xs text-muted-foreground leading-relaxed pl-3 border-l border-amber-500/30">
-              {line}
-            </li>
-          ))}
-        </ul>
-      </section>
-
-      {briefing.stack.gStack.length > 0 && (
-        <p className="text-[10px] text-muted-foreground border-t border-border/40 pt-3">
-          G-Stack chain: {briefing.stack.gStack.join(' → ')}
-          {briefing.stack.crustdata ? ' · grounded in CrustData' : ''}
+      {briefing.recommendations[0] && (
+        <p className="text-base sm:text-lg text-foreground/85 leading-relaxed border-l-2 border-emerald-500/50 pl-4">
+          {briefing.recommendations[0]}
         </p>
       )}
-    </div>
+
+      <Button
+        onClick={onListen}
+        disabled={listening}
+        className="h-11 w-full sm:w-auto rounded-xl text-sm font-medium bg-gradient-to-r from-violet-600 to-blue-600 hover:from-violet-500 hover:to-blue-500"
+      >
+        <Volume2 data-icon="inline-start" className="size-4" />
+        {listening ? 'Playing…' : 'Listen to briefing'}
+      </Button>
+    </motion.div>
   )
 }
 
@@ -253,20 +145,25 @@ function BriefingPanel({ briefing }: { briefing: ManagerBriefing }) {
 /* ------------------------------------------------------------------ */
 
 export function VoiceManager() {
-  const { refresh } = useWorkspace()
+  const { data, loading, refresh } = useWorkspace()
+  const { language, languageCode, resolveForText, resolveLanguageForText } = useVoiceLanguage()
   const [status, setStatus] = useState<ManagerStatus>('idle')
-  const [messages, setMessages] = useState<VoiceMessage[]>([WELCOME])
+  const [messages, setMessages] = useState<VoiceMessage[]>([
+    { role: 'assistant', content: buildWelcome(null) },
+  ])
   const [interim, setInterim] = useState('')
   const [input, setInput] = useState('')
   const [autoSpeak, setAutoSpeak] = useState(true)
   const [liveMode, setLiveMode] = useState(false)
   const [voiceStatus, setVoiceStatus] = useState<VoiceStatus | null>(null)
   const [latestBriefing, setLatestBriefing] = useState<ManagerBriefing | null>(null)
+  const [executionPhase, setExecutionPhase] = useState(0)
+  const [voiceMode, setVoiceMode] = useState<VoiceMode>('agent')
 
   const recognitionRef = useRef<SpeechRecognitionLike | null>(null)
   const recorderRef = useRef<MediaRecorder | null>(null)
   const audioRef = useRef<HTMLAudioElement | null>(null)
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const bottomRef = useRef<HTMLDivElement>(null)
   const statusRef = useRef(status)
   statusRef.current = status
   const liveModeRef = useRef(liveMode)
@@ -284,8 +181,18 @@ export function VoiceManager() {
   }, [])
 
   useEffect(() => {
+    if (!data) return
+    setMessages((prev) => {
+      if (prev.length === 1 && prev[0].role === 'assistant' && !prev[0].briefing) {
+        return [{ role: 'assistant', content: buildWelcome(data) }]
+      }
+      return prev
+    })
+  }, [data])
+
+  useEffect(() => {
     requestAnimationFrame(() => {
-      scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight, behavior: 'smooth' })
+      bottomRef.current?.scrollIntoView({ behavior: 'smooth', block: 'nearest' })
     })
   }, [messages, status, interim])
 
@@ -309,14 +216,15 @@ export function VoiceManager() {
     setStatus((s) => (s === 'speaking' ? 'idle' : s))
   }, [])
 
-  const speak = useCallback(async (text: string) => {
+  const speak = useCallback(async (text: string, langCode = resolveForText(text)) => {
     if (!text.trim()) return
+    const voiceLang = resolveLanguageForText(text)
     setStatus('speaking')
     try {
       const res = await fetch('/api/voice/speak', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ text }),
+        body: JSON.stringify({ text, language: langCode }),
       })
       if (!res.ok) throw new Error('elevenlabs unavailable')
       const blob = await res.blob()
@@ -344,6 +252,7 @@ export function VoiceManager() {
         }
         speechResolveRef.current = settle
         const utterance = new SpeechSynthesisUtterance(text)
+        utterance.lang = voiceLang.utteranceLang
         utterance.rate = 1.02
         utterance.onend = settle
         utterance.onerror = settle
@@ -353,7 +262,7 @@ export function VoiceManager() {
       audioRef.current = null
       setStatus((s) => (s === 'speaking' ? 'idle' : s))
     }
-  }, [])
+  }, [resolveForText, resolveLanguageForText])
 
   /* ------------------------- command flow -------------------------- */
 
@@ -363,22 +272,35 @@ export function VoiceManager() {
       if (!trimmed || statusRef.current === 'executing') return
 
       stopSpeaking()
-      const history = messages.filter((m) => m !== WELCOME).map(({ role, content }) => ({ role, content }))
+      const history = messages
+        .filter((m) => m.role === 'user' || (m.role === 'assistant' && m.briefing))
+        .map(({ role, content }) => ({ role, content }))
       setMessages((prev) => [...prev, { role: 'user', content: trimmed }])
       setInput('')
       setInterim('')
+      setExecutionPhase(0)
       setStatus('executing')
+
+      const phaseTimer = window.setInterval(() => {
+        setExecutionPhase((p) => Math.min(p + 1, 4))
+      }, 800)
 
       try {
         const res = await fetch('/api/voice/command', {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ transcript: trimmed, history }),
+          body: JSON.stringify({ transcript: trimmed, history, language: languageCode }),
         })
         const json = await res.json()
         if (!res.ok || !json?.success) throw new Error(json?.error || `Command failed (${res.status})`)
 
-        const data = json.data as VoiceMessage & { briefing: ManagerBriefing; live: boolean; message: string }
+        const data = json.data as VoiceMessage & {
+          briefing: ManagerBriefing
+          live: boolean
+          message: string
+          detectedLanguage?: 'en' | 'bn' | 'ja'
+        }
+        const responseLang = data.detectedLanguage ?? resolveForText(trimmed)
         setMessages((prev) => [
           ...prev,
           {
@@ -388,14 +310,19 @@ export function VoiceManager() {
             briefing: data.briefing,
           },
         ])
-        setLatestBriefing(data.briefing)
+        setLatestBriefing(
+          data.briefing.insights.length > 0 ||
+            data.actionsExecuted?.some((a) => a.type === 'run_agent' || a.type === 'run_workflow')
+            ? data.briefing
+            : null,
+        )
 
         if (data.actionsExecuted?.some((a) => a.type === 'run_agent' || a.type === 'run_workflow')) {
           await refresh()
         }
 
         setStatus('idle')
-        if (autoSpeak || liveModeRef.current) await speak(data.briefing.spokenSummary)
+        if (autoSpeak || liveModeRef.current) await speak(data.briefing.spokenSummary, responseLang)
         // Live conversation: hand the mic back automatically after the briefing.
         if (liveModeRef.current && statusRef.current === 'idle') startListeningRef.current()
       } catch (err) {
@@ -403,9 +330,12 @@ export function VoiceManager() {
         setMessages((prev) => [...prev, { role: 'assistant', content: `I hit a problem: ${message}` }])
         toast.error(message)
         setStatus('idle')
+      } finally {
+        window.clearInterval(phaseTimer)
+        setExecutionPhase(0)
       }
     },
-    [messages, autoSpeak, refresh, speak, stopSpeaking],
+    [messages, autoSpeak, refresh, speak, stopSpeaking, languageCode, resolveForText],
   )
 
   /* ------------------------- speech input -------------------------- */
@@ -427,6 +357,7 @@ export function VoiceManager() {
         try {
           const form = new FormData()
           form.append('audio', new File(chunks, 'command.webm', { type: recorder.mimeType || 'audio/webm' }))
+          form.append('language', languageCode)
           const res = await fetch('/api/voice/transcribe', { method: 'POST', body: form })
           const json = await res.json()
           const transcript: string = json?.data?.transcript ?? ''
@@ -444,7 +375,7 @@ export function VoiceManager() {
       toast.error('Microphone access denied — type your command instead')
       setStatus('idle')
     }
-  }, [runCommand])
+  }, [runCommand, languageCode])
 
   const startListening = useCallback(() => {
     const recognition = getSpeechRecognition()
@@ -456,7 +387,7 @@ export function VoiceManager() {
     let finalTranscript = ''
     recognition.continuous = false
     recognition.interimResults = true
-    recognition.lang = 'en-US'
+    recognition.lang = language.speechRecognitionLang
     recognition.onresult = (event) => {
       let interimText = ''
       for (let i = event.resultIndex; i < event.results.length; i++) {
@@ -483,7 +414,7 @@ export function VoiceManager() {
     recognitionRef.current = recognition
     recognition.start()
     setStatus('listening')
-  }, [runCommand, startRecorderFallback])
+  }, [runCommand, startRecorderFallback, language.speechRecognitionLang])
   startListeningRef.current = startListening
 
   const handleOrbClick = () => {
@@ -512,247 +443,144 @@ export function VoiceManager() {
 
   const executing = status === 'executing' || status === 'transcribing'
 
+  const pipelineStage = pipelineStageForStatus(status, executionPhase)
+  const showPipeline = pipelineStage !== null
+  const campaignName = data?.campaign.companyName || 'Voice Manager'
+
   return (
-    <div className="flex flex-col gap-5">
-      {/* Hero: orb + status + pillars */}
-      <div className="rounded-2xl border border-violet-500/20 bg-gradient-to-br from-violet-500/10 via-background/40 to-blue-500/5 p-6 backdrop-blur-sm">
-        <div className="flex flex-col md:flex-row md:items-center gap-6">
-          <VoiceOrb status={status} onClick={handleOrbClick} />
-          <div className="flex-1 min-w-0">
-            <h2 className="font-display text-2xl tracking-tight">Voice Manager</h2>
-            <p className={cn('text-sm mt-1', status === 'listening' ? 'text-rose-300' : 'text-muted-foreground')}>
-              {STATUS_COPY[status]}
-            </p>
-            {interim && (
-              <p className="text-sm mt-2 text-violet-200 italic truncate">&ldquo;{interim}&rdquo;</p>
-            )}
-            <div className="flex flex-wrap gap-2 mt-4">
-              <PillarChip
-                icon={Brain}
-                label="G-Brain"
-                active={voiceStatus?.gBrain ?? false}
-                detail="Executive orchestration — parses intent and commands all 11 agents"
-              />
-              <PillarChip
-                icon={Layers}
-                label="G-Stack"
-                active={(voiceStatus?.gStack.length ?? 0) > 0}
-                detail={
-                  voiceStatus?.gStack.length
-                    ? `Layered model chain: ${voiceStatus.gStack.join(' → ')}`
-                    : 'Add OPENAI_API_KEY / KIMI_API_KEY to activate the model stack'
-                }
-              />
-              <PillarChip
-                icon={Database}
-                label="CrustData"
-                active={voiceStatus?.crustdata ?? false}
-                detail="Real company & market data grounds every briefing in evidence"
-              />
-              <PillarChip
-                icon={AudioLines}
-                label="ElevenLabs"
-                active={voiceStatus?.voice.enabled ?? false}
-                detail={
-                  voiceStatus?.voice.enabled
-                    ? `Neural voice via ${voiceStatus.voice.model}`
-                    : 'Add ELEVENLABS_API_KEY for neural voice (browser TTS fallback active)'
-                }
-              />
-            </div>
-          </div>
-          <div className="flex flex-wrap md:flex-col gap-2 shrink-0">
-            <Button
-              variant={liveMode ? 'default' : 'outline'}
-              size="sm"
-              onClick={toggleLiveMode}
-              disabled={executing}
-              className={cn(
-                'h-9 rounded-xl text-xs',
-                liveMode && 'bg-gradient-to-r from-rose-500 to-violet-600 hover:from-rose-600 hover:to-violet-700 text-white border-0',
-              )}
-            >
-              <Radio data-icon="inline-start" className={cn('size-3.5', liveMode && 'animate-pulse')} />
-              {liveMode ? 'Live conversation on' : 'Live conversation'}
-            </Button>
-            <Button
-              variant="outline"
-              size="sm"
-              onClick={() => setAutoSpeak((v) => !v)}
-              className="h-9 rounded-xl text-xs"
-            >
-              {autoSpeak ? (
-                <Volume2 data-icon="inline-start" className="size-3.5 text-emerald-300" />
-              ) : (
-                <VolumeX data-icon="inline-start" className="size-3.5" />
-              )}
-              {autoSpeak ? 'Auto-brief on' : 'Auto-brief off'}
-            </Button>
-            {latestBriefing && (
-              <Button
-                variant="outline"
-                size="sm"
-                disabled={status === 'speaking' || executing}
-                onClick={() => void speak(latestBriefing.spokenSummary)}
-                className="h-9 rounded-xl text-xs"
-              >
-                <AudioLines data-icon="inline-start" className="size-3.5 text-violet-300" />
-                Replay briefing
-              </Button>
-            )}
-          </div>
-        </div>
+    <div className="flex flex-col gap-5 max-w-4xl mx-auto">
+      <div className="flex items-center justify-between gap-3">
+        <p className="text-sm text-muted-foreground hidden sm:block">Speak naturally — agent or mic mode</p>
+        <VoiceLanguageSelect />
       </div>
 
-      <div className="grid gap-5 lg:grid-cols-[1fr_380px] items-start">
-        {/* Conversation */}
-        <div className="flex flex-col rounded-xl border border-border/60 bg-background/40 backdrop-blur-sm overflow-hidden min-h-[480px] h-[calc(100vh-27rem)]">
-          <ScrollArea className="flex-1 min-h-0">
-            <div ref={scrollRef} className="p-4 space-y-4">
-              {messages.map((msg, i) => (
-                <div
-                  key={`${msg.role}-${i}`}
-                  className={cn('flex gap-3', msg.role === 'user' ? 'flex-row-reverse' : 'flex-row')}
-                >
-                  <div
-                    className={cn(
-                      'flex size-8 shrink-0 items-center justify-center rounded-lg',
-                      msg.role === 'user'
-                        ? 'bg-gradient-to-br from-violet-500 to-blue-500'
-                        : 'bg-violet-500/15 border border-violet-500/20',
-                    )}
+      <VoiceLiveStage
+        mode={voiceMode}
+        onModeChange={setVoiceMode}
+        agentEnabled={voiceStatus?.voice?.enabled ?? false}
+        agentId={voiceStatus?.agent?.agentId ?? null}
+        language={languageCode}
+        campaignName={campaignName}
+        commandStatus={status}
+        interim={interim}
+        liveMode={liveMode}
+        autoSpeak={autoSpeak}
+        executing={executing}
+        onOrbClick={handleOrbClick}
+        onToggleLive={toggleLiveMode}
+        onToggleAutoSpeak={() => setAutoSpeak((v) => !v)}
+        onAgentMessage={(msg) => setMessages((prev) => [...prev, msg].slice(-8))}
+        onAgentRefresh={refresh}
+      />
+
+      {showPipeline && voiceMode === 'commands' && (
+        <div className="rounded-2xl border border-border/40 bg-secondary/20 px-4 py-3">
+          <DataPipelineFlow
+            activeStage={pipelineStage}
+            crustdataActive={voiceStatus?.crustdata ?? false}
+            compact
+          />
+        </div>
+      )}
+
+      <LiveWorkspaceRail data={data} loading={loading} className="opacity-90" />
+
+      {voiceMode === 'commands' && (
+        <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+          {QUICK_COMMANDS.map(({ label, cmd }) => (
+            <Button
+              key={label}
+              variant="outline"
+              disabled={executing}
+              onClick={() => void runCommand(cmd)}
+              className="h-12 rounded-xl text-sm font-medium border-border/60 hover:bg-violet-500/10"
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+      )}
+
+      {latestBriefing && (
+        <div className="rounded-2xl border border-border/50 bg-background/50 p-5 sm:p-6">
+          <BriefingPanel
+            briefing={latestBriefing}
+            onListen={() => void speak(latestBriefing.spokenSummary)}
+            listening={status === 'speaking'}
+          />
+        </div>
+      )}
+
+      <div className="rounded-2xl border border-border/50 bg-background/40 overflow-hidden flex flex-col h-[min(320px,42dvh)] min-h-[220px]">
+        <div className="px-4 py-2 border-b border-border/40 flex items-center gap-2">
+          <Bot className="size-4 text-violet-400" />
+          <span className="text-xs font-medium text-muted-foreground uppercase tracking-wider">Transcript</span>
+        </div>
+        <ScrollArea className="flex-1 min-h-0 overflow-hidden">
+          <div className="p-4 space-y-3 pb-2">
+            <AnimatePresence initial={false}>
+              {messages.slice(-8).map((msg, i) => {
+                const text = msg.content
+                const isUser = msg.role === 'user'
+                return (
+                  <motion.div
+                    key={`${msg.role}-${i}-${text.slice(0, 20)}`}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    className={cn('flex gap-2 items-start', isUser ? 'justify-end' : 'flex-row')}
                   >
-                    {msg.role === 'user' ? (
-                      <Mic className="size-4 text-white" />
-                    ) : (
-                      <Bot className="size-4 text-violet-300" />
-                    )}
-                  </div>
-                  <div
-                    className={cn(
-                      'max-w-[85%] rounded-xl px-4 py-3 text-sm',
-                      msg.role === 'user'
-                        ? 'bg-gradient-to-br from-violet-500/20 to-blue-500/10 border border-violet-500/20'
-                        : 'bg-secondary/40 border border-border/40',
-                    )}
-                  >
-                    <p className="leading-relaxed whitespace-pre-wrap text-foreground/90">{msg.content}</p>
-                    {msg.role === 'assistant' && (msg.actionsExecuted?.length || msg.briefing) ? (
-                      <div className="mt-3 pt-3 border-t border-border/40 space-y-2.5">
-                        {msg.actionsExecuted?.some((a) => a.results?.length) && (
-                          <div className="flex flex-wrap gap-1">
-                            {msg.actionsExecuted
-                              .flatMap((a) => a.results ?? [])
-                              .map((r) => (
-                                <Badge
-                                  key={r.agentId}
-                                  variant={r.status === 'failed' ? 'destructive' : 'secondary'}
-                                  className="text-[10px]"
-                                >
-                                  {r.agentName}
-                                </Badge>
-                              ))}
-                          </div>
-                        )}
-                        {msg.actionsExecuted && (
-                          <ViewGenerationButtons actions={msg.actionsExecuted} compact />
-                        )}
-                        {msg.briefing && (
-                          <button
-                            type="button"
-                            onClick={() => void speak(msg.briefing!.spokenSummary)}
-                            disabled={executing || status === 'speaking'}
-                            className="inline-flex items-center gap-1.5 text-[11px] text-violet-300 hover:text-violet-200 disabled:opacity-50"
-                          >
-                            <Volume2 className="size-3" /> Hear this briefing
-                          </button>
-                        )}
+                    {!isUser && (
+                      <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-violet-500/15">
+                        <Bot className="size-3.5 text-violet-300" />
                       </div>
-                    ) : null}
-                  </div>
-                </div>
-              ))}
+                    )}
+                    <p
+                      className={cn(
+                        'max-w-[88%] rounded-xl px-3 py-2 text-sm leading-relaxed',
+                        isUser
+                          ? 'bg-violet-500/15 text-violet-50'
+                          : 'bg-secondary/50 text-foreground/85',
+                      )}
+                    >
+                      {text}
+                    </p>
+                  </motion.div>
+                )
+              })}
+            </AnimatePresence>
 
-              {executing && (
-                <div className="flex gap-3">
-                  <div className="flex size-8 shrink-0 items-center justify-center rounded-lg bg-violet-500/15 border border-violet-500/20">
-                    <Bot className="size-4 text-violet-300" />
-                  </div>
-                  <div className="rounded-xl px-4 py-3 bg-secondary/40 border border-border/40">
-                    <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                      <Loader2 className="size-4 animate-spin" />
-                      {status === 'transcribing' ? 'Transcribing…' : 'Dispatching agents & compiling your briefing…'}
-                    </div>
-                  </div>
-                </div>
-              )}
-            </div>
-          </ScrollArea>
-
-          <div className="px-3 pt-2 flex gap-1.5 overflow-x-auto thin-scroll shrink-0">
-            {SUGGESTED_COMMANDS.map((cmd) => (
-              <button
-                key={cmd}
-                type="button"
-                onClick={() => void runCommand(cmd)}
-                disabled={executing}
-                className="shrink-0 rounded-full border border-border/60 bg-secondary/30 px-3 py-1 text-[11px] text-muted-foreground hover:bg-violet-500/10 hover:text-foreground hover:border-violet-500/30 disabled:opacity-50 transition-colors"
-              >
-                {cmd}
-              </button>
-            ))}
+            {executing && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="flex justify-center py-3">
+                <Loader2 className="size-6 animate-spin text-violet-400" />
+              </motion.div>
+            )}
+            <div ref={bottomRef} className="h-px shrink-0" aria-hidden />
           </div>
+        </ScrollArea>
 
-          <form
-            onSubmit={(e) => {
-              e.preventDefault()
-              void runCommand(input)
-            }}
-            className="border-t border-border/60 p-3 shrink-0"
+        <form
+          onSubmit={(e) => {
+            e.preventDefault()
+            void runCommand(input)
+          }}
+          className="relative z-10 shrink-0 border-t border-border/50 bg-background/95 backdrop-blur-sm p-3 flex gap-2"
+        >
+          <Input
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            placeholder="Or type here…"
+            disabled={executing}
+            className="h-10 flex-1 min-w-0 rounded-xl text-sm bg-secondary/30 border-border/50 px-3"
+          />
+          <Button
+            type="submit"
+            size="icon"
+            disabled={executing || !input.trim()}
+            className="size-10 shrink-0 rounded-xl"
           >
-            <div className="flex gap-2 items-end">
-              <Textarea
-                value={input}
-                onChange={(e) => setInput(e.target.value)}
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' && !e.shiftKey) {
-                    e.preventDefault()
-                    void runCommand(input)
-                  }
-                }}
-                placeholder="Or type a command… e.g. Run research, generate posts, then brief me"
-                disabled={executing}
-                rows={2}
-                className="min-h-[44px] max-h-32 resize-none bg-secondary/30 border-border/60 text-sm"
-              />
-              <Button type="submit" size="icon" disabled={executing || !input.trim()} className="shrink-0 size-10">
-                {executing ? <Loader2 className="animate-spin" /> : <Send />}
-              </Button>
-            </div>
-            <p className="mt-2 text-[10px] text-muted-foreground flex items-center gap-1">
-              <Sparkles className="size-3" />
-              The manager executes any agent, the full workflow, or answers with a data briefing
-            </p>
-          </form>
-        </div>
-
-        {/* Briefing panel */}
-        <div className="rounded-xl border border-border/60 bg-background/40 backdrop-blur-sm p-5 lg:sticky lg:top-20">
-          {latestBriefing ? (
-            <BriefingPanel briefing={latestBriefing} />
-          ) : (
-            <div className="flex flex-col items-center text-center py-10 gap-3">
-              <div className="flex size-12 items-center justify-center rounded-2xl bg-violet-500/15 border border-violet-500/20">
-                <Brain className="size-6 text-violet-300" />
-              </div>
-              <p className="text-sm font-medium">No briefing yet</p>
-              <p className="text-xs text-muted-foreground max-w-[260px] leading-relaxed">
-                Give the manager a command and it will report back here with metrics, analysis,
-                recommendations, and your CrustData competitive edge.
-              </p>
-            </div>
-          )}
-        </div>
+            {executing ? <Loader2 className="size-4 animate-spin" /> : <Send className="size-4" />}
+          </Button>
+        </form>
       </div>
     </div>
   )

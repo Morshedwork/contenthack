@@ -99,6 +99,19 @@ export interface ContentDraft {
   campaignId: string
 }
 
+export type VideoFormat = 'reel' | 'shorts' | 'tiktok' | 'story'
+
+export type VideoPromotionType =
+  | 'product_launch'
+  | 'sale'
+  | 'testimonial'
+  | 'brand_awareness'
+  | 'event'
+  | 'tutorial'
+  | 'ugc'
+  | 'lead_gen'
+  | 'announcement'
+
 export interface VideoScript {
   id: string
   title: string
@@ -110,6 +123,10 @@ export interface VideoScript {
   cta: string
   duration: string
   status: ContentStatus
+  format?: VideoFormat
+  promotionType?: VideoPromotionType
+  sourceContentId?: string
+  sourcePlatform?: Platform
   generatedVideo?: GeneratedVideo
 }
 
@@ -184,6 +201,8 @@ export interface Lead {
   name: string
   company: string
   role: string
+  /** Public profile URL (e.g. LinkedIn) from Bright Data lead discovery */
+  profileUrl?: string
   platform: Platform
   matchReason: string
   painPoint: string

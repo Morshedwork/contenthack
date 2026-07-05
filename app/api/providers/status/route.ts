@@ -31,7 +31,7 @@ export async function GET() {
       text: providers.textAI
         ? [providers.openai && 'openai', providers.kimi && 'kimi'].filter(Boolean).join('+') || 'layered'
         : null,
-      data: providers.crustdata ? 'crustdata' : null,
+      data: [providers.brightdata && 'brightdata', providers.crustdata && 'crustdata'].filter(Boolean).join('+') || null,
       imagePrompt: media.kimi ? 'kimi' : media.openai ? 'openai' : null,
       imageRender: media.openai ? 'openai' : 'pollinations',
       video: media.pixverse ? 'pixverse' : null,

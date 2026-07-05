@@ -16,7 +16,7 @@ const sections = [
   },
   {
     title: 'Workflow',
-    content: 'Campaign Goal → Market Research → Topic Strategy → Content Studio → Video Studio → Approval Board → Calendar → Publishing → Lead Finder → Outreach → ROI Analytics',
+    content: 'Campaign Goal → Market Research → Topic Strategy → Content Studio → Video Studio → Approve & Publish → Calendar → Lead Finder → Outreach → ROI Analytics',
   },
   {
     title: 'Productivity Improvement',
@@ -46,7 +46,7 @@ export default function ImpactReportPage() {
 
       <Card className="mb-6 bg-violet-500/5 border-violet-500/20">
         <CardContent className="p-6">
-          <WorkflowPipeline steps={workflowSteps} activeIndex={8} compact />
+          <WorkflowPipeline steps={workflowSteps} activeIndex={7} compact />
         </CardContent>
       </Card>
 

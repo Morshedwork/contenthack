@@ -1,3 +1,4 @@
+import { hasBrightData } from '@/lib/ai/brightdata'
 import { hasCrustdata } from '@/lib/ai/crustdata'
 import { hasElevenLabs } from '@/lib/ai/elevenlabs'
 import { hasTextAI } from '@/lib/ai/layer'
@@ -16,6 +17,7 @@ export interface AppProviders {
   /** At least one text provider (OpenAI and/or Kimi) — layered AI stack. */
   textAI: boolean
   crustdata: boolean
+  brightdata: boolean
   pixverse: boolean
   elevenlabs: boolean
   supabase: boolean
@@ -31,6 +33,7 @@ export function getAppProviders(): AppProviders {
     kimi: hasKimi(),
     textAI: hasTextAI(),
     crustdata: hasCrustdata(),
+    brightdata: hasBrightData(),
     pixverse: hasPixverse(),
     elevenlabs: hasElevenLabs(),
     supabase: hasSupabaseConfig(),
@@ -61,6 +64,7 @@ export function defaultVideoModel(): PixverseModel {
 export function configuredEnvVarNames(): string[] {
   const names = [
     'OPENAI_API_KEY',
+    'BRIGHTDATA_API_KEY',
     'CRUSTDATA_API_KEY',
     'KIMI_API_KEY',
     'PIXVERSE_API_KEY',

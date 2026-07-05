@@ -2,12 +2,25 @@ import type {
   MarketResearch,
   ContentDraft,
   VideoScript,
+  VideoFormat,
+  VideoPromotionType,
   Lead,
   OutreachMessage,
   Platform,
   BrandProfile,
 } from '@/types'
 import { DEMO_COMPANY, demoBrandProfile } from '@/lib/demo/data'
+import {
+  brightDataPromptBlock,
+  fetchBrightDataLeads,
+  hasBrightData,
+} from './brightdata'
+import { fetchCrustdataLeadProspects } from './crustdata'
+import {
+  buildLeadsFromProspects,
+  dedupeProspects,
+  mergeProfileUrls,
+} from './lead-prospects'
 import {
   crustdataPromptBlock,
   fetchTaskContext,
@@ -17,6 +30,10 @@ import {
 import { generateJSON, generateText } from './layer'
 import { appendCustomPrompt, normalizeCustomPromptDetails, platformsFromPromptHint } from './prompt-utils'
 import { MODEL_TASK, resolveTaskModel, type TaskModelConfig } from '@/lib/models/routing'
+import {
+  getVideoFormatLabel,
+  VIDEO_PROMOTION_TYPES,
+} from '@/lib/models/video-options'
 
 function buildBrandContext(profile?: BrandProfile, region?: string): string {
   const p = profile ?? demoBrandProfile
@@ -338,8 +355,167 @@ Return JSON with this shape:
     aiVideoPrompt: s.aiVideoPrompt ?? '',
     cta: s.cta ?? profile.ctaStyle,
     duration: s.duration ?? '0:45',
-    status: 'draft',
+    status: 'draft' as const,
   }))
+}
+
+function mapVideoScripts(
+  scripts: Partial<VideoScript>[] | undefined,
+  profile: BrandProfile,
+  extras?: Partial<VideoScript>,
+): VideoScript[] {
+  return (scripts ?? []).map((s, i) => ({
+    id: id('v', i),
+    title: s.title ?? `Video ${i + 1}`,
+    hook: s.hook ?? '',
+    scenes: s.scenes ?? [],
+    voiceover: s.voiceover ?? '',
+    bRoll: s.bRoll ?? [],
+    aiVideoPrompt: s.aiVideoPrompt ?? '',
+    cta: s.cta ?? profile.ctaStyle,
+    duration: s.duration ?? '0:45',
+    status: 'draft' as const,
+    ...extras,
+    ...(s.sourceContentId ? { sourceContentId: s.sourceContentId } : {}),
+    ...(s.sourcePlatform ? { sourcePlatform: s.sourcePlatform } : {}),
+  }))
+}
+
+/** Generate reel scripts adapted from existing content drafts (one reel per draft). */
+export async function generateReelsFromContent(input: {
+  contentDrafts: ContentDraft[]
+  format?: VideoFormat
+  customPromptDetails?: string
+  brandProfile?: BrandProfile
+  research?: MarketResearch | null
+  signals?: CrustdataTaskInput
+  modelConfig?: TaskModelConfig
+}): Promise<VideoScript[]> {
+  const mc = taskConfig(input, MODEL_TASK.VIDEO_SCRIPTS)
+  const profile = input.brandProfile ?? demoBrandProfile
+  const format = input.format ?? 'reel'
+  const formatLabel = getVideoFormatLabel(format)
+  const brandContext = buildBrandContext(input.brandProfile)
+  const crustdataContext = await loadCrustdata(
+    MODEL_TASK.VIDEO_SCRIPTS,
+    { topic: input.contentDrafts.map((d) => d.hook).join('; ') },
+    input,
+  )
+
+  const draftBlocks = input.contentDrafts
+    .map(
+      (d, i) => `--- Draft ${i + 1} (${d.platform}) ---
+ID: ${d.id}
+Hook: ${d.hook}
+Copy: ${d.mainCopy}
+CTA: ${d.cta}
+Hashtags: ${d.hashtags.join(', ')}`,
+    )
+    .join('\n\n')
+
+  const data = await generateJSON<{ scripts?: Partial<VideoScript>[] }>({
+    model: mc.model,
+    fallbackModel: mc.fallbackModel,
+    modelChain: mc.modelChain,
+    temperature: mc.temperature,
+    maxTokens: mc.maxTokens,
+    system: `You are a short-form video scriptwriter. Adapt written content into ${formatLabel} scripts. Respond only with valid JSON.`,
+    user: appendCustomPrompt(`${brandContext}${crustdataPromptBlock(crustdataContext, 'video trend data')}
+
+Convert each content draft below into a separate ${formatLabel} script. Preserve the core message, hook energy, and CTA. Optimize pacing for vertical short-form (15–60s).
+
+${draftBlocks}
+
+Return JSON:
+{
+  "scripts": [
+    {
+      "title": "string",
+      "hook": "first 3-second hook",
+      "scenes": [{"title": "string", "voiceover": "string", "onScreenText": "string", "visuals": "string"}],
+      "voiceover": "full voiceover",
+      "bRoll": ["string"],
+      "aiVideoPrompt": "prompt for AI video generator — vertical 9:16, ${formatLabel} style",
+      "cta": "string",
+      "duration": "e.g. 0:30",
+      "sourceContentId": "draft id from input",
+      "sourcePlatform": "platform from draft"
+    }
+  ]
+}
+
+Write exactly ${input.contentDrafts.length} script(s), one per draft.`, input.customPromptDetails),
+  })
+
+  return mapVideoScripts(data.scripts, profile, { format }).map((script, i) => ({
+    ...script,
+    sourceContentId: script.sourceContentId ?? input.contentDrafts[i]?.id,
+    sourcePlatform: script.sourcePlatform ?? input.contentDrafts[i]?.platform,
+  }))
+}
+
+/** Generate multiple promotion-focused reel scripts for a specific campaign type. */
+export async function generatePromotionReels(input: {
+  promotionType: VideoPromotionType
+  topic?: string
+  count?: number
+  format?: VideoFormat
+  customPromptDetails?: string
+  brandProfile?: BrandProfile
+  research?: MarketResearch | null
+  signals?: CrustdataTaskInput
+  modelConfig?: TaskModelConfig
+}): Promise<VideoScript[]> {
+  const mc = taskConfig(input, MODEL_TASK.VIDEO_SCRIPTS)
+  const count = input.count ?? 3
+  const format = input.format ?? 'reel'
+  const formatLabel = getVideoFormatLabel(format)
+  const promo = VIDEO_PROMOTION_TYPES.find((p) => p.id === input.promotionType)
+  const brandContext = buildBrandContext(input.brandProfile)
+  const profile = input.brandProfile ?? demoBrandProfile
+  const crustdataContext = await loadCrustdata(
+    MODEL_TASK.VIDEO_SCRIPTS,
+    { topic: input.topic ?? promo?.label },
+    input,
+  )
+
+  const data = await generateJSON<{ scripts?: Partial<VideoScript>[] }>({
+    model: mc.model,
+    fallbackModel: mc.fallbackModel,
+    modelChain: mc.modelChain,
+    temperature: mc.temperature,
+    maxTokens: mc.maxTokens,
+    system: `You are a short-form video scriptwriter specializing in promotional ${formatLabel} content. Respond only with valid JSON.`,
+    user: appendCustomPrompt(`${brandContext}${crustdataPromptBlock(crustdataContext, 'video trend data')}
+
+Promotion type: ${promo?.label ?? input.promotionType}
+Goal: ${promo?.description ?? ''}
+Hook style: ${promo?.hookStyle ?? 'Attention-grabbing, platform-native'}
+${input.topic ? `Topic / offer focus: ${input.topic}` : ''}
+
+Write ${count} distinct ${formatLabel} scripts for this promotion type. Vary hooks and angles (e.g. problem-led, stat-led, story-led) while staying on-brand.
+
+Return JSON:
+{
+  "scripts": [
+    {
+      "title": "string",
+      "hook": "first 3-second hook",
+      "scenes": [{"title": "string", "voiceover": "string", "onScreenText": "string", "visuals": "string"}],
+      "voiceover": "full voiceover",
+      "bRoll": ["string"],
+      "aiVideoPrompt": "vertical 9:16 ${formatLabel}, ${promo?.label ?? 'promotional'} style",
+      "cta": "string",
+      "duration": "e.g. 0:30"
+    }
+  ]
+}`, input.customPromptDetails),
+  })
+
+  return mapVideoScripts(data.scripts, profile, {
+    format,
+    promotionType: input.promotionType,
+  })
 }
 
 // ─── Leads ───────────────────────────────────────────────────────────────────
@@ -356,27 +532,71 @@ export async function generateLeads(input: {
   const count = input.count ?? 12
   const brandContext = buildBrandContext(input.brandProfile)
   const profile = input.brandProfile ?? demoBrandProfile
-  const crustdataContext = await loadCrustdata(
-    MODEL_TASK.LEAD_SCORING,
-    {
-      criteria: input.criteria,
-      targetCustomer: profile.targetAudience,
-      count,
-    },
-    input,
-  )
+  const leadSignals = {
+    criteria: input.criteria,
+    targetCustomer: profile.targetAudience,
+    industry: input.research?.industry ?? input.brandProfile?.targetAudience,
+    region: input.research?.region,
+    count,
+  }
+
+  const brightData = hasBrightData()
+    ? await fetchBrightDataLeads(leadSignals)
+    : { context: '', prospects: [] }
+
+  const crustdataProspects = await fetchCrustdataLeadProspects({
+    criteria: input.criteria,
+    targetCustomer: profile.targetAudience,
+    count,
+  })
+
+  const allProspects = dedupeProspects([...brightData.prospects, ...crustdataProspects])
+
+  const crustdataContext =
+    brightData.context ||
+    (allProspects.length === 0
+      ? await loadCrustdata(
+          MODEL_TASK.LEAD_SCORING,
+          {
+            criteria: input.criteria,
+            targetCustomer: profile.targetAudience,
+            count,
+          },
+          input,
+        )
+      : '')
+
+  const prospectContext = brightData.context
+    ? brightDataPromptBlock(brightData.context, 'prospect profiles')
+    : allProspects.length > 0
+      ? crustdataPromptBlock(
+          allProspects
+            .map(
+              (prospect, index) =>
+                `${index + 1}. ${prospect.name} | profileUrl: ${prospect.profileUrl || 'n/a'} | company: ${prospect.company || 'n/a'} | title: ${prospect.role || 'n/a'}`,
+            )
+            .join('\n'),
+          'prospect profiles',
+        )
+      : crustdataPromptBlock(crustdataContext, 'prospect profiles')
+
+  const usingRealProspects = allProspects.length > 0
+  const leadCountForPrompt = usingRealProspects ? Math.min(allProspects.length, count) : count
+
   const data = await generateJSON<{ leads?: Partial<Lead>[] }>({
     model: mc.model,
     fallbackModel: mc.fallbackModel,
     modelChain: mc.modelChain,
     temperature: mc.temperature,
     maxTokens: Math.max(mc.maxTokens, 4096),
-    system: crustdataContext
-      ? `You are a B2B lead generation researcher. CrustData profiles below are real indexed people — map them into qualified leads with scores and outreach angles. Do not invent different names or companies when real profiles are provided. Respond only with a valid JSON object.`
+    system: prospectContext
+      ? brightData.context
+        ? `You are a B2B lead generation researcher. Bright Data LinkedIn profiles below are real public people with profile URLs — score each prospect and add outreach angles. Preserve each profileUrl exactly as provided. Do not invent different names, companies, or URLs. Respond only with a valid JSON object.`
+        : `You are a B2B lead generation researcher. Real indexed profiles below include profileUrl fields — score each and add outreach angles. Preserve profileUrl exactly. Do not invent different names, companies, or URLs. Respond only with a valid JSON object.`
       : `You are a B2B lead generation researcher. Generate realistic, plausible prospect profiles (these are illustrative examples, not real contact data). Respond only with a valid JSON object.`,
-    user: appendCustomPrompt(`${brandContext}${crustdataPromptBlock(crustdataContext, 'prospect profiles')}
+    user: appendCustomPrompt(`${brandContext}${prospectContext}
 ${input.criteria ? `Targeting criteria: ${input.criteria}` : ''}
-Generate ${count} qualified prospect profiles that fit the ideal customer.
+${usingRealProspects ? `Score and enrich these ${leadCountForPrompt} real prospects.` : `Generate ${count} qualified prospect profiles that fit the ideal customer.`}
 
 Return JSON with this shape:
 {
@@ -385,6 +605,7 @@ Return JSON with this shape:
       "name": "Full Name",
       "company": "Company",
       "role": "Job title",
+      "profileUrl": "https://www.linkedin.com/in/username",
       "platform": "linkedin"|"instagram"|"facebook"|"x",
       "matchReason": "why they matched",
       "painPoint": "their likely pain point",
@@ -397,11 +618,20 @@ Return JSON with this shape:
 }`, input.customPromptDetails),
   })
 
-  return (data.leads ?? []).map((l, i) => ({
+  const rawLeads = data.leads ?? []
+
+  if (usingRealProspects) {
+    return buildLeadsFromProspects(allProspects, rawLeads, count, profile, (i) => id('l', i))
+  }
+
+  const profileUrls = mergeProfileUrls(rawLeads, allProspects)
+
+  return rawLeads.map((l, i) => ({
     id: id('l', i),
     name: l.name ?? `Prospect ${i + 1}`,
     company: l.company ?? '',
     role: l.role ?? '',
+    profileUrl: l.profileUrl || profileUrls[i]?.profileUrl || undefined,
     platform: (l.platform as Platform) || 'linkedin',
     matchReason: l.matchReason ?? '',
     painPoint: l.painPoint ?? '',

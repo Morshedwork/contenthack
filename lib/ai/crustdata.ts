@@ -1,4 +1,6 @@
 import { MODEL_TASK, type ModelTaskType } from '@/lib/models/routing'
+import type { LeadProspect } from '@/lib/ai/lead-prospects'
+import { dedupeProspects, isLinkedInProfileUrl, normalizeLinkedInUrl } from '@/lib/ai/lead-prospects'
 import type { BrandProfile, MarketResearch } from '@/types'
 
 const CRUSTDATA_BASE = 'https://api.crustdata.com'
@@ -137,6 +139,32 @@ async function crustdataFetch<T>(path: string, body: unknown): Promise<T> {
   return data as T
 }
 
+function readCurrentJob(employment: Record<string, unknown> | null): { company: string; title: string } {
+  const raw = employment?.current
+  if (Array.isArray(raw)) {
+    const first = readRecord(raw[0])
+    return {
+      company: readString(first?.name) || readString(first?.company_name),
+      title: readString(first?.title),
+    }
+  }
+  const current = readRecord(raw)
+  return {
+    company: readString(current?.name) || readString(current?.company_name),
+    title: readString(current?.title),
+  }
+}
+
+const LEAD_PERSON_FIELDS = [
+  'basic_profile.name',
+  'basic_profile.headline',
+  'basic_profile.current_title',
+  'basic_profile.location',
+  'experience.employment_details.current.name',
+  'experience.employment_details.current.title',
+  'social_handles.professional_network_identifier.profile_url',
+] as const
+
 function andFilters(conditions: CrustdataFilterCondition[]): CrustdataFilter {
   if (conditions.length === 0) {
     return { field: 'basic_info.name', type: '(.)', value: 'company' }
@@ -190,25 +218,73 @@ function summarizeProfile(profile: unknown, index: number): string {
   const basic = readRecord(row.basic_profile)
   const experience = readRecord(row.experience)
   const employment = readRecord(experience?.employment_details)
-  const current = readRecord(employment?.current)
+  const currentJob = readCurrentJob(employment)
   const social = readRecord(row.social_handles)
   const networkId = readRecord(social?.professional_network_identifier)
   const location = readRecord(basic?.location)
+  const profileUrl = normalizeLinkedInUrl(readString(networkId?.profile_url))
 
   const parts = [
     `${index + 1}. ${readString(basic?.name) || 'Unknown person'}`,
     readString(basic?.headline) ? `headline: ${readString(basic?.headline)}` : '',
-    readString(current?.title) || readString(basic?.current_title)
-      ? `title: ${readString(current?.title) || readString(basic?.current_title)}`
+    currentJob.title || readString(basic?.current_title)
+      ? `title: ${currentJob.title || readString(basic?.current_title)}`
       : '',
-    readString(current?.company_name) ? `company: ${readString(current?.company_name)}` : '',
+    currentJob.company ? `company: ${currentJob.company}` : '',
     readString(location?.full_location) || readString(basic?.location)
       ? `location: ${readString(location?.full_location) || readString(basic?.location)}`
       : '',
-    readString(networkId?.profile_url) ? `profile: ${readString(networkId?.profile_url)}` : '',
+    profileUrl ? `profileUrl: ${profileUrl}` : '',
   ].filter(Boolean)
 
   return parts.join(' | ')
+}
+
+function parseCrustdataProfile(profile: unknown): LeadProspect | null {
+  const row = readRecord(profile)
+  if (!row) return null
+
+  const basic = readRecord(row.basic_profile)
+  const experience = readRecord(row.experience)
+  const employment = readRecord(experience?.employment_details)
+  const currentJob = readCurrentJob(employment)
+  const social = readRecord(row.social_handles)
+  const networkId = readRecord(social?.professional_network_identifier)
+  const location = readRecord(basic?.location)
+  const profileUrl = normalizeLinkedInUrl(readString(networkId?.profile_url))
+  const name = readString(basic?.name)
+
+  if (!name && !profileUrl) return null
+
+  return {
+    name: name || 'Unknown prospect',
+    profileUrl,
+    company: currentJob.company,
+    role: currentJob.title || readString(basic?.current_title) || readString(basic?.headline),
+    location: readString(location?.full_location) || readString(basic?.location) || undefined,
+    headline: readString(basic?.headline) || undefined,
+  }
+}
+
+function parseLinkedInWebResult(result: unknown): LeadProspect | null {
+  const row = readRecord(result)
+  if (!row) return null
+  const profileUrl = normalizeLinkedInUrl(readString(row.url))
+  if (!isLinkedInProfileUrl(profileUrl)) return null
+
+  const title = readString(row.title).replace(/\s*\|\s*LinkedIn.*$/i, '').trim()
+  const parts = title.split(/\s[-–—]\s/).map((part) => part.trim()).filter(Boolean)
+  const name = parts[0] || title || 'Unknown prospect'
+  const role = parts[1] || ''
+  const company = parts.length >= 3 ? parts.slice(2).join(' - ') : ''
+
+  return {
+    name,
+    profileUrl,
+    company,
+    role,
+    headline: readString(row.snippet) || undefined,
+  }
 }
 
 function summarizeWebResult(result: unknown, index: number): string {
@@ -286,7 +362,7 @@ async function fetchPersonByNameAndCompany(name?: string, company?: string): Pro
   }
   if (company?.trim()) {
     conditions.push({
-      field: 'experience.employment_details.current.company_name',
+      field: 'experience.employment_details.current.name',
       type: '(.)',
       value: company.trim(),
     })
@@ -297,15 +373,7 @@ async function fetchPersonByNameAndCompany(name?: string, company?: string): Pro
     const search = await crustdataFetch<{ profiles?: unknown[] }>('/person/search', {
       filters: andFilters(conditions),
       limit: 3,
-      fields: [
-        'basic_profile.name',
-        'basic_profile.headline',
-        'basic_profile.current_title',
-        'basic_profile.location',
-        'experience.employment_details.current.company_name',
-        'experience.employment_details.current.title',
-        'social_handles.professional_network_identifier.profile_url',
-      ],
+      fields: [...LEAD_PERSON_FIELDS],
     })
     const profiles = (search.profiles ?? [])
       .map((profile, index) => summarizeProfile(profile, index))
@@ -315,6 +383,66 @@ async function fetchPersonByNameAndCompany(name?: string, company?: string): Pro
   } catch {
     return ''
   }
+}
+
+export async function fetchCrustdataLeadProspects(input: {
+  criteria?: string
+  targetCustomer?: string
+  count?: number
+}): Promise<LeadProspect[]> {
+  if (!hasCrustdata()) return []
+
+  const focus = (input.criteria || input.targetCustomer || '').trim()
+  const limit = Math.min(Math.max(input.count ?? 12, 5), 25)
+  const conditions: CrustdataFilterCondition[] = [
+    { field: 'basic_profile.headline', type: '(!)', value: 'Intern' },
+    { field: 'basic_profile.headline', type: '(!)', value: 'Student' },
+  ]
+
+  if (focus) {
+    conditions.unshift({
+      field: 'basic_profile.headline',
+      type: '(.)',
+      value: focus,
+    })
+  }
+
+  const prospects: LeadProspect[] = []
+
+  try {
+    const search = await crustdataFetch<{ profiles?: unknown[] }>('/person/search', {
+      filters: andFilters(conditions),
+      limit,
+      sorts: [{ field: 'professional_network.connections', order: 'desc' }],
+      fields: [...LEAD_PERSON_FIELDS],
+    })
+
+    for (const profile of search.profiles ?? []) {
+      const parsed = parseCrustdataProfile(profile)
+      if (parsed) prospects.push(parsed)
+    }
+  } catch (err) {
+    console.warn('[crustdata] lead prospect fetch failed:', err)
+  }
+
+  if (prospects.filter((p) => p.profileUrl).length < Math.min(limit, 5) && focus) {
+    try {
+      const web = await crustdataFetch<{ results?: unknown[] }>('/web/search/live', {
+        query: `site:linkedin.com/in ${focus}`,
+        limit,
+      })
+      for (const result of web.results ?? []) {
+        const parsed = parseLinkedInWebResult(result)
+        if (parsed) prospects.push(parsed)
+      }
+    } catch (err) {
+      console.warn('[crustdata] LinkedIn web search failed:', err)
+    }
+  }
+
+  return dedupeProspects(prospects)
+    .sort((a, b) => Number(Boolean(b.profileUrl)) - Number(Boolean(a.profileUrl)))
+    .slice(0, limit)
 }
 
 function cachedResearchLines(input: CrustdataTaskInput): string[] {
@@ -366,7 +494,6 @@ export async function fetchResearchContext(input: {
           'basic_info.name',
           'basic_info.primary_domain',
           'headcount.total',
-          'headcount.growth_percent.12m',
           'taxonomy.professional_network_industry',
           'funding.total_investment_usd',
           'funding.last_round_type',
@@ -429,15 +556,7 @@ export async function fetchLeadContext(input: {
         filters: andFilters(conditions),
         limit: Math.min(Math.max(input.count ?? 12, 5), 25),
         sorts: [{ field: 'professional_network.connections', order: 'desc' }],
-        fields: [
-          'basic_profile.name',
-          'basic_profile.headline',
-          'basic_profile.current_title',
-          'basic_profile.location',
-          'experience.employment_details.current.company_name',
-          'experience.employment_details.current.title',
-          'social_handles.professional_network_identifier.profile_url',
-        ],
+        fields: [...LEAD_PERSON_FIELDS],
       },
     )
 
@@ -448,7 +567,7 @@ export async function fetchLeadContext(input: {
     if (profiles.length === 0) return ''
 
     return [
-      'CrustData person search (real indexed profiles — use these as lead sources):',
+      'CrustData person search (real indexed profiles with profileUrl — use these as lead sources):',
       ...profiles,
       search.total_count !== undefined ? `total_matches: ${search.total_count}` : '',
     ]

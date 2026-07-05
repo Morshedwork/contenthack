@@ -21,7 +21,7 @@ const phases = [
     id: 'operate',
     label: 'Operate',
     description: 'Review and distribute',
-    steps: ['Approval Board', 'Calendar', 'Publishing'],
+    steps: ['Approve & Publish', 'Calendar'],
   },
   {
     id: 'grow',

@@ -203,9 +203,9 @@ export const demoCalendarPosts: CalendarPost[] = [
 ]
 
 export const demoLeads: Lead[] = [
-  { id: 'l1', name: 'Yuki Tanaka', company: 'TechFlow Tokyo', role: 'CTO', platform: 'linkedin', matchReason: 'Posted about manual ops bottlenecks', painPoint: 'Spending 25hrs/week on manual workflows', suggestedOffer: 'Free AI automation audit', score: 94, status: 'qualified', suggestedAction: 'Send personalized LinkedIn connection' },
-  { id: 'l2', name: 'Sarah Chen', company: 'GrowthLab SG', role: 'Founder', platform: 'linkedin', matchReason: 'Engaged with AI automation content', painPoint: 'Scaling ops without hiring', suggestedOffer: 'AI agent starter package', score: 89, status: 'reviewed', suggestedAction: 'Send case study email' },
-  { id: 'l3', name: 'Marcus Weber', company: 'DataPulse GmbH', role: 'Head of Ops', platform: 'linkedin', matchReason: 'Commented on automation ROI post', painPoint: 'Disconnected marketing tools', suggestedOffer: 'Integration assessment', score: 87, status: 'contacted', suggestedAction: 'Follow up on connection request' },
+  { id: 'l1', name: 'Yuki Tanaka', company: 'TechFlow Tokyo', role: 'CTO', profileUrl: 'https://www.linkedin.com/in/yuki-tanaka-demo', platform: 'linkedin', matchReason: 'Posted about manual ops bottlenecks', painPoint: 'Spending 25hrs/week on manual workflows', suggestedOffer: 'Free AI automation audit', score: 94, status: 'qualified', suggestedAction: 'Send personalized LinkedIn connection' },
+  { id: 'l2', name: 'Sarah Chen', company: 'GrowthLab SG', role: 'Founder', profileUrl: 'https://www.linkedin.com/in/sarah-chen-demo', platform: 'linkedin', matchReason: 'Engaged with AI automation content', painPoint: 'Scaling ops without hiring', suggestedOffer: 'AI agent starter package', score: 89, status: 'reviewed', suggestedAction: 'Send case study email' },
+  { id: 'l3', name: 'Marcus Weber', company: 'DataPulse GmbH', role: 'Head of Ops', profileUrl: 'https://www.linkedin.com/in/marcus-weber-demo', platform: 'linkedin', matchReason: 'Commented on automation ROI post', painPoint: 'Disconnected marketing tools', suggestedOffer: 'Integration assessment', score: 87, status: 'contacted', suggestedAction: 'Follow up on connection request' },
   { id: 'l4', name: 'Aiko Yamamoto', company: 'Sakura Ventures', role: 'Marketing Director', platform: 'instagram', matchReason: 'Follows AI business accounts', painPoint: 'Content creation bottleneck', suggestedOffer: 'ContentOps demo', score: 82, status: 'new', suggestedAction: 'Draft outreach message' },
   { id: 'l5', name: 'James Okonkwo', company: 'AfriTech Solutions', role: 'CEO', platform: 'linkedin', matchReason: 'Searching for web dev + AI partners', painPoint: 'Need modern website with AI features', suggestedOffer: 'Web + AI bundle', score: 91, status: 'qualified', suggestedAction: 'Schedule discovery call' },
   { id: 'l6', name: 'Emily Rodriguez', company: 'ScaleUp MX', role: 'COO', platform: 'linkedin', matchReason: 'Shared post about hiring challenges', painPoint: 'Can\'t afford full ops team', suggestedOffer: 'AI agent team proposal', score: 86, status: 'replied', suggestedAction: 'Send proposal document' },
@@ -337,5 +337,5 @@ export const overviewKPIs = [
 
 export const workflowSteps = [
   'Campaign Goal', 'Market Research', 'Topic Strategy', 'Content Studio', 'Video Studio',
-  'Approval Board', 'Calendar', 'Publishing', 'Lead Finder', 'Outreach', 'ROI Analytics',
+  'Approve & Publish', 'Calendar', 'Lead Finder', 'Outreach', 'ROI Analytics',
 ]

@@ -1,20 +1,36 @@
 import 'server-only'
 
-import { runAgentTask, executeFullWorkflow } from '@/lib/agents/engine'
+import { runAgentTask, executeFullWorkflow, WORKFLOW_ORDER } from '@/lib/agents/engine'
 import {
   buildWorkspaceSnapshot,
   describeAgentPlan,
   matchAgentsFromMessage,
-  resolveAgentPlan,
+  resolveAgenticPlan,
   type AgentId,
   type WorkspaceSnapshot,
 } from '@/lib/agents/planner'
+import { buildChatAgentPlan } from '@/lib/agents/chat-plan'
 import { normalizeCustomPromptDetails } from '@/lib/ai/prompt-utils'
 import { generateJSON, generateText, generateChat, hasTextAI, withAI } from '@/lib/ai/layer'
 import { MODEL_TASK, resolveTaskModel } from '@/lib/models/routing'
-import type { ChatActionExecuted, ChatMessage, ChatMode, ChatResponse } from '@/lib/agents/types'
+import type {
+  ChatActionExecuted,
+  ChatAgentPlan,
+  ChatMessage,
+  ChatMode,
+  ChatResponse,
+  ChatStreamEvent,
+} from '@/lib/agents/types'
+import {
+  buildChatArtifacts,
+  buildChatReferences,
+  formatArtifactsForPrompt,
+  snapshotWorkspaceArtifacts,
+} from '@/lib/agents/chat-artifacts'
+import { buildBasicChatSuggestedActions, buildChatSuggestedActions } from '@/lib/agents/chat-suggestions'
 import { getWorkspace, patchWorkspace } from '@/lib/workspace/store'
 import { resolveWorkspaceContext } from '@/lib/workspace/context'
+import { voiceLanguageInstruction } from '@/lib/voice/languages'
 import type { AgentDefinition } from '@/types'
 
 export const AGENT_CATALOG = [
@@ -38,6 +54,37 @@ interface ParsedIntent {
   agentIds: string[]
   customPromptDetails: string
   assistantMessage: string
+  reasoning?: string
+}
+
+export type ChatProgressCallback = (event: ChatStreamEvent) => void
+
+function isAbortSignal(signal?: AbortSignal) {
+  return Boolean(signal?.aborted)
+}
+
+function markRemainingPlanStepsSkipped(
+  plan: ChatAgentPlan | null | undefined,
+  emit?: ChatProgressCallback,
+): ChatAgentPlan | null {
+  if (!plan) return plan ?? null
+  const steps = plan.steps.map((step) => {
+    if (step.status === 'pending' || step.status === 'running') {
+      emit?.({ type: 'step', agentId: step.agentId, status: 'skipped', output: 'Stopped' })
+      return { ...step, status: 'skipped' as const, output: 'Stopped' }
+    }
+    return step
+  })
+  return { ...plan, steps }
+}
+
+function buildStoppedMessage(actionsExecuted: ChatActionExecuted[]): string {
+  const completed =
+    actionsExecuted.flatMap((a) => a.results ?? []).filter((r) => r.status === 'completed').length
+  if (completed > 0) {
+    return `Stopped. ${completed} agent${completed === 1 ? '' : 's'} finished — results are saved in your workspace. Send another prompt to continue.`
+  }
+  return 'Stopped before any agents finished. Send another prompt when you are ready.'
 }
 
 const VALID_AGENT_IDS = new Set<string>(AGENT_CATALOG.map((a) => a.id))
@@ -59,7 +106,20 @@ function buildWorkspaceSummary(ws: Awaited<ReturnType<typeof getWorkspace>>): st
   ].join('\n')
 }
 
+const CASUAL_CHAT_RE =
+  /^(hi|hello|hey|how are you|how'?s it going|good (morning|afternoon|evening)|what'?s up|thanks|thank you|bye|goodbye|nice to meet you)\b/i
+
 function parseIntentFallback(message: string): ParsedIntent {
+  const trimmed = message.trim()
+  if (CASUAL_CHAT_RE.test(trimmed)) {
+    return {
+      action: 'respond_only',
+      agentIds: [],
+      customPromptDetails: '',
+      assistantMessage: '',
+    }
+  }
+
   const match = matchAgentsFromMessage(message)
 
   if (match.kind === 'full_workflow') {
@@ -121,30 +181,32 @@ async function parseIntent(
         fallbackModel: orchestratorModel.fallbackModel,
         modelChain: orchestratorModel.modelChain,
         temperature: 0.2,
-        maxTokens: 800,
-        system: `You are the ContentOps AI orchestrator. Parse user requests into the MINIMUM agent actions needed.
+        maxTokens: 450,
+        system: `You are the ContentOps autonomous orchestrator — a marketing ops agent that PLANS and EXECUTES, not a passive chatbot.
 
 Available agents:
 ${agentList}
 
 Actions:
-- run_agents: run one or more specific agents (set agentIds) — prefer ONE agent when the request is single-purpose
-- run_full_workflow: ONLY when the user explicitly asks for the full pipeline / everything / end-to-end
-- get_status: summarize current agent/workspace status (no agent execution)
-- set_custom_prompt: save standing instructions for future agent runs (use customPromptDetails)
-- respond_only: answer without running agents (help, clarification, general questions)
+- run_agents: run one or more agents (set agentIds) — chain when the user's goal requires multiple steps
+- run_full_workflow: when user wants end-to-end / everything / full pipeline / launch campaign
+- get_status: workspace status only (no execution)
+- set_custom_prompt: save standing instructions (customPromptDetails)
+- respond_only: greetings, help, clarification — no execution
 
-Rules:
-- DEFAULT TO MINIMAL: "Generate LinkedIn posts" → content only. "Market research" → research only.
-- Do NOT run all agents unless the user clearly asks for full workflow / entire pipeline / everything.
-- Do NOT add research, strategy, or safety as "helpful extras" unless the user chained steps ("research then write posts") or named that agent.
-- Multi-agent runs are allowed ONLY when the user explicitly combines tasks ("find leads and draft outreach", "research then content").
-- Extract operational instructions into customPromptDetails (tone, region, offer focus, word limits, etc.)
-- agentIds must only use valid ids: ${[...VALID_AGENT_IDS].join(', ')}
-- Order agentIds in pipeline order when multiple are truly needed: research → strategy → content → video → safety → scheduler → publisher → leadfinder → outreach → analytics
-- Keep assistantMessage concise — name only the agents you will actually run
+Agentic behavior:
+- Think like an ops lead: infer what the user wants DONE, not just what they literally said.
+- "LinkedIn posts for Japan SMEs" → content (add strategy if no topics exist — the runtime will expand).
+- "Launch my campaign" / "get content ready" → run_full_workflow or research → strategy → content → safety → scheduler.
+- "Find leads and reach out" → leadfinder + outreach.
+- Chain agents when the outcome clearly needs multiple steps — do NOT ask "shall I proceed?"; state your plan in assistantMessage.
+- Extract tone, region, offer, platforms into customPromptDetails.
+- agentIds: ${[...VALID_AGENT_IDS].join(', ')}
+- Pipeline order: research → strategy → content → video → safety → scheduler → publisher → leadfinder → outreach → analytics
+- reasoning: 1–2 sentences on WHY you chose this plan (shown to the user before execution).
+- assistantMessage: first-person plan, e.g. "I'll run market research, then draft LinkedIn posts for your Japan SME offer."
 
-Return JSON: { "action", "agentIds", "customPromptDetails", "assistantMessage" }`,
+Return JSON: { "action", "agentIds", "customPromptDetails", "assistantMessage", "reasoning" }`,
         user: `Workspace state:\n${workspaceSummary}\n\nRecent chat:\n${historyText || 'none'}\n\nUser message: ${message}`,
       }),
     )
@@ -186,7 +248,12 @@ Return JSON: { "action", "agentIds", "customPromptDetails", "assistantMessage" }
   }
 
   if (action === 'run_agents' && agentIds.length > 0) {
-    agentIds = resolveAgentPlan(agentIds, message, wsSnapshot)
+    agentIds = resolveAgenticPlan(agentIds, message, wsSnapshot)
+  }
+
+  if (CASUAL_CHAT_RE.test(message.trim()) && action !== 'run_agents' && action !== 'run_full_workflow') {
+    action = 'respond_only'
+    agentIds = []
   }
 
   return {
@@ -199,6 +266,14 @@ Return JSON: { "action", "agentIds", "customPromptDetails", "assistantMessage" }
         : typeof result.assistantMessage === 'string'
           ? result.assistantMessage
           : 'Done.',
+    reasoning:
+      typeof result.reasoning === 'string' && result.reasoning.trim()
+        ? result.reasoning.trim()
+        : action === 'run_agents' && agentIds.length > 0
+          ? `Executing ${agentIds.length} step${agentIds.length === 1 ? '' : 's'} to complete your request.`
+          : action === 'run_full_workflow'
+            ? 'Running the full content operations pipeline end to end.'
+            : '',
   }
 }
 
@@ -208,54 +283,156 @@ async function buildStatusMessage(ws: Awaited<ReturnType<typeof getWorkspace>>):
   const failed = ws.agents.filter((a) => a.status === 'failed')
 
   const lines = [
-    `**Workspace:** ${ws.campaign.companyName || 'Untitled campaign'}`,
-    `**Agents:** ${completed.length} completed, ${running.length} running, ${failed.length} failed`,
+    `Workspace: ${ws.campaign.companyName || 'Untitled campaign'}`,
+    `Agents: ${completed.length} completed, ${running.length} running, ${failed.length} failed`,
   ]
 
   if (running.length) {
-    lines.push('', '**Currently running:**')
+    lines.push('', 'Currently running:')
     running.forEach((a) => lines.push(`- ${a.name}: ${a.currentTask} (${a.progress}%)`))
   }
 
   const recent = ws.agents.filter((a) => a.lastOutput).slice(0, 5)
   if (recent.length) {
-    lines.push('', '**Recent outputs:**')
+    lines.push('', 'Recent outputs:')
     recent.forEach((a) => lines.push(`- ${a.name}: ${a.lastOutput}`))
   }
 
   return lines.join('\n')
 }
 
+function voiceManagerSystemPrompt(
+  ws: Awaited<ReturnType<typeof getWorkspace>>,
+  language?: string,
+): string {
+  const campaign = ws.campaign
+  const langInstruction = voiceLanguageInstruction(language)
+  return `You are the Voice Manager for ContentOps AI${
+    campaign.companyName ? `, helping ${campaign.companyName}` : ''
+  }.
+
+Language: ${langInstruction}
+
+Answer naturally like a sharp marketing ops lead — warm, direct, easy to speak aloud.
+- For greetings or "how are you": respond personally (e.g. you're doing well, energized, ready to help). Do NOT recite workspace metrics unless they ask.
+- For help: explain you can run research, content, leads, outreach, or the full workflow on command.
+- Keep replies under 3 short sentences. No markdown, no bullet lists, no JSON.
+Campaign: ${campaign.companyName || 'not set'} | Goal: ${campaign.campaignGoal || 'not set'}`
+}
+
 async function summarizeResults(
   intent: ParsedIntent,
   actionsExecuted: ChatActionExecuted[],
   ws: Awaited<ReturnType<typeof getWorkspace>>,
+  userMessage: string,
+  history: ChatMessage[] = [],
+  enrichment?: Pick<ChatResponse, 'artifacts' | 'references'>,
+  language?: string,
 ): Promise<string> {
+  const langInstruction = voiceLanguageInstruction(language)
+  const artifactContext = enrichment
+    ? formatArtifactsForPrompt(enrichment.artifacts ?? [], enrichment.references ?? [])
+    : ''
+
   if (!hasTextAI()) {
     if (intent.action === 'get_status') return buildStatusMessage(ws)
     const ran = actionsExecuted.flatMap((a) => a.results ?? [])
-    if (ran.length === 0) return intent.assistantMessage
-    return [
+    if (ran.length === 0) {
+      return (
+        intent.assistantMessage ||
+        "I'm here and ready to help — try research, content, leads, or say run the full workflow."
+      )
+    }
+    const lines = [
       intent.assistantMessage,
       '',
-      ...ran.map((r) => `**${r.agentName}** (${r.status}): ${r.lastOutput}`),
-    ].join('\n')
+      ...ran.map((r) => `${r.agentName} (${r.status}): ${r.lastOutput}`),
+    ]
+    if (enrichment?.references?.length) {
+      lines.push('', 'Where to view:', ...enrichment.references.map((r) => `- ${r.label}: ${r.href}`))
+    }
+    return lines.join('\n')
   }
 
-  const chatModel = resolveTaskModel(MODEL_TASK.ANALYTICS_SUMMARY, ws.modelRouting)
-  const { result } = await withAI(() =>
-    generateText({
+  const chatModel = resolveTaskModel(MODEL_TASK.CONTENT_GENERATION, ws.modelRouting)
+
+  // Fast path: casual chat — one LLM call, natural reply (no workspace dump).
+  if (intent.action === 'respond_only' && actionsExecuted.length === 0) {
+    const message = await generateChat({
       model: chatModel.model,
       fallbackModel: chatModel.fallbackModel,
       modelChain: chatModel.modelChain,
+      temperature: 0.75,
+      maxTokens: 220,
+      messages: [
+        { role: 'system', content: voiceManagerSystemPrompt(ws, language) },
+        ...history.slice(-6).map((m) => ({
+          role: m.role as 'user' | 'assistant',
+          content: m.content,
+        })),
+        { role: 'user', content: userMessage },
+      ],
+    })
+    return message?.trim() || intent.assistantMessage || "I'm doing well — what should we tackle?"
+  }
+
+  if (intent.action === 'get_status' && actionsExecuted.every((a) => a.type === 'status')) {
+    const statusText = await buildStatusMessage(ws)
+    const { result } = await withAI(() =>
+      generateText({
+        model: chatModel.model,
+        fallbackModel: chatModel.fallbackModel,
+        modelChain: chatModel.modelChain,
+        temperature: 0.4,
+        maxTokens: 400,
+        system: `Summarize workspace status for voice playback. Language: ${langInstruction} Use real numbers from the data. Friendly, concise, spoken style — no markdown lists.`,
+        user: `User asked: "${userMessage}"\n\nWorkspace status:\n${statusText}`,
+      }),
+    )
+    return result
+  }
+
+  const summaryModel = resolveTaskModel(MODEL_TASK.ANALYTICS_SUMMARY, ws.modelRouting)
+  const { result } = await withAI(() =>
+    generateText({
+      model: summaryModel.model,
+      fallbackModel: summaryModel.fallbackModel,
+      modelChain: summaryModel.modelChain,
       temperature: 0.5,
-      maxTokens: 600,
-      system: `You are ContentOps AI assistant. Summarize agent execution results for the user in a friendly, concise way. Use markdown sparingly (bold for agent names). Be specific about what was produced.`,
-      user: `User asked: ${intent.customPromptDetails || '(status check)'}\n\nActions taken: ${JSON.stringify(actionsExecuted, null, 2)}\n\nDraft reply: ${intent.assistantMessage}`,
+      maxTokens: 650,
+      system: `You are ContentOps AI — an autonomous marketing ops agent reporting results after execution.
+
+Language: ${langInstruction}
+
+Format rules:
+- Speak in first person past tense: "I researched…", "I drafted…"
+- Use **bold** for key metrics or counts.
+- Cite outputs with markdown links exactly as provided, e.g. [View posts](/dashboard/content).
+- Structure: outcome paragraph → **Where to find it** with 2–4 links when references exist.
+- Be decisive — recommend the obvious next step in the final sentence.`,
+      user: [
+        `User asked: "${userMessage}"`,
+        '',
+        `Actions taken: ${JSON.stringify(actionsExecuted, null, 2)}`,
+        '',
+        `Draft reply: ${intent.assistantMessage}`,
+        artifactContext ? `\n${artifactContext}` : '',
+      ].join('\n'),
     }),
   )
 
   return result
+}
+
+function enrichChatResponse(
+  ws: Awaited<ReturnType<typeof getWorkspace>>,
+  actionsExecuted: ChatActionExecuted[],
+  beforeSnapshot: ReturnType<typeof snapshotWorkspaceArtifacts>,
+): Pick<ChatResponse, 'artifacts' | 'references' | 'suggestedActions'> {
+  const artifacts = buildChatArtifacts(ws, actionsExecuted, beforeSnapshot)
+  const references = buildChatReferences(actionsExecuted, artifacts)
+  const suggestedActions = buildChatSuggestedActions(actionsExecuted, ws)
+  return { artifacts, references, suggestedActions }
 }
 
 export async function handleBasicChat(
@@ -295,7 +472,8 @@ Region: ${campaign.region || 'global'}
 
 Help with brainstorming, copy feedback, hooks, captions, content strategy, and marketing questions.
 You are in basic chat mode — answer conversationally only. Do not claim to run agents, workflows, or tools.
-Keep replies concise, practical, and actionable.`,
+When helpful, point users to dashboard areas using markdown links like [Content studio](/dashboard/content) or [Image studio](/dashboard/image).
+Keep replies concise, practical, and actionable. Use **bold** for emphasis and markdown links for navigation hints.`,
       },
       ...messages.slice(-20).map((m) => ({
         role: m.role as 'user' | 'assistant',
@@ -304,20 +482,31 @@ Keep replies concise, practical, and actionable.`,
     ],
   })
 
+  const lastUser = [...messages].reverse().find((m) => m.role === 'user')
+
   return {
     message: message || 'I could not generate a response.',
     actionsExecuted: [],
     agents: ws.agents,
     live: true,
+    suggestedActions: lastUser ? buildBasicChatSuggestedActions(lastUser.content) : undefined,
   }
 }
 
 export async function handleAgentChat(
   messages: ChatMessage[],
-  options?: { allowAnonymous?: boolean },
+  options?: {
+    allowAnonymous?: boolean
+    onProgress?: ChatProgressCallback
+    language?: string
+    signal?: AbortSignal
+  },
 ): Promise<ChatResponse> {
+  const emit = options?.onProgress
+  const signal = options?.signal
   const ctx = await resolveWorkspaceContext({ allowAnonymous: options?.allowAnonymous })
   const ws = await getWorkspace(ctx)
+  const beforeSnapshot = snapshotWorkspaceArtifacts(ws)
   const lastUser = [...messages].reverse().find((m) => m.role === 'user')
   if (!lastUser) throw new Error('No user message provided')
 
@@ -330,6 +519,24 @@ export async function handleAgentChat(
     wsSnapshot,
     ws.modelRouting,
   )
+
+  const agentIdsForPlan =
+    intent.action === 'run_full_workflow'
+      ? ([...WORKFLOW_ORDER] as AgentId[])
+      : (intent.agentIds as AgentId[])
+
+  let plan = buildChatAgentPlan({
+    goal: lastUser.content,
+    reasoning: intent.reasoning || intent.assistantMessage,
+    agentIds: agentIdsForPlan,
+    catalog: AGENT_CATALOG,
+    action: intent.action,
+    workflowAgentIds: [...WORKFLOW_ORDER] as AgentId[],
+  })
+
+  if (plan) {
+    emit?.({ type: 'plan', plan })
+  }
 
   const actionsExecuted: ChatActionExecuted[] = []
   let anyLive = false
@@ -345,9 +552,24 @@ export async function handleAgentChat(
   }
 
   if (intent.action === 'run_full_workflow') {
-    const { workflowId, estimatedTimeSaved, agents, live } = await executeFullWorkflow(
+    const { workflowId, estimatedTimeSaved, agents, live, aborted } = await executeFullWorkflow(
       intent.customPromptDetails || ws.customPromptDetails || undefined,
-      { allowAnonymous: options?.allowAnonymous },
+      {
+        allowAnonymous: options?.allowAnonymous,
+        signal,
+        onAgentStep: ({ agentId, status, lastOutput }) => {
+          const stepStatus = status === 'completed' ? 'completed' : status === 'failed' ? 'failed' : 'running'
+          emit?.({ type: 'step', agentId, status: stepStatus, output: lastOutput })
+          if (plan) {
+            plan = {
+              ...plan,
+              steps: plan.steps.map((s) =>
+                s.agentId === agentId ? { ...s, status: stepStatus, output: lastOutput } : s,
+              ),
+            }
+          }
+        },
+      },
     )
     if (live) anyLive = true
     actionsExecuted.push({
@@ -361,50 +583,112 @@ export async function handleAgentChat(
         lastOutput: a.lastOutput,
       })),
     })
-    const finalWs = await getWorkspace(ctx)
-    const message = await summarizeResults(intent, actionsExecuted, finalWs)
-    return { message, actionsExecuted, agents, live: anyLive || hasTextAI() }
-  }
-
-  if (intent.action === 'run_agents' && intent.agentIds.length > 0) {
+    if (aborted || signal?.aborted) {
+      plan = markRemainingPlanStepsSkipped(plan, emit)
+    }
+  } else if (intent.action === 'run_agents' && intent.agentIds.length > 0) {
     const results: ChatActionExecuted['results'] = []
     for (const agentId of intent.agentIds) {
+      if (isAbortSignal(signal)) break
+      emit?.({ type: 'step', agentId, status: 'running' })
+      if (plan) {
+        plan = {
+          ...plan,
+          steps: plan.steps.map((s) =>
+            s.agentId === agentId ? { ...s, status: 'running' } : s,
+          ),
+        }
+      }
       try {
         const { agent, live } = await runAgentTask(agentId, {
           customPromptDetails: intent.customPromptDetails || ws.customPromptDetails || undefined,
           allowAnonymous: options?.allowAnonymous,
         })
         if (live) anyLive = true
+        const stepStatus = agent.status === 'failed' ? 'failed' : 'completed'
         results.push({
           agentId: agent.id,
           agentName: agent.name,
           status: agent.status,
           lastOutput: agent.lastOutput,
         })
+        emit?.({ type: 'step', agentId, status: stepStatus, output: agent.lastOutput })
+        if (plan) {
+          plan = {
+            ...plan,
+            steps: plan.steps.map((s) =>
+              s.agentId === agentId
+                ? { ...s, status: stepStatus, output: agent.lastOutput }
+                : s,
+            ),
+          }
+        }
       } catch (err) {
         const agent = AGENT_CATALOG.find((a) => a.id === agentId)
+        const lastOutput = err instanceof Error ? err.message : 'Agent run failed'
         results.push({
           agentId,
           agentName: agent?.name ?? agentId,
           status: 'failed',
-          lastOutput: err instanceof Error ? err.message : 'Agent run failed',
+          lastOutput,
         })
+        emit?.({ type: 'step', agentId, status: 'failed', output: lastOutput })
+        if (plan) {
+          plan = {
+            ...plan,
+            steps: plan.steps.map((s) =>
+              s.agentId === agentId ? { ...s, status: 'failed', output: lastOutput } : s,
+            ),
+          }
+        }
       }
     }
     actionsExecuted.push({ type: 'run_agent', agentIds: intent.agentIds, results })
-  }
-
-  if (intent.action === 'get_status') {
+    if (signal?.aborted) {
+      plan = markRemainingPlanStepsSkipped(plan, emit)
+    }
+  } else if (intent.action === 'get_status') {
     actionsExecuted.push({ type: 'status' })
   }
 
-  const finalWs = await getWorkspace(ctx)
-  const message = await summarizeResults(intent, actionsExecuted, finalWs)
+  if (signal?.aborted) {
+    const finalWs = await getWorkspace(ctx)
+    const enrichment = enrichChatResponse(finalWs, actionsExecuted, beforeSnapshot)
+    const response: ChatResponse = {
+      message: buildStoppedMessage(actionsExecuted),
+      actionsExecuted,
+      agents: finalWs.agents,
+      live: anyLive || hasTextAI(),
+      ...enrichment,
+      plan: plan ?? undefined,
+    }
+    emit?.({ type: 'done', response })
+    return response
+  }
 
-  return {
+  emit?.({ type: 'summarizing' })
+
+  const finalWs = await getWorkspace(ctx)
+  const enrichment = enrichChatResponse(finalWs, actionsExecuted, beforeSnapshot)
+  const message = await summarizeResults(
+    intent,
+    actionsExecuted,
+    finalWs,
+    lastUser.content,
+    messages.slice(0, -1),
+    enrichment,
+    options?.language,
+  )
+
+  const response: ChatResponse = {
     message,
     actionsExecuted,
     agents: finalWs.agents,
-    live: anyLive || (hasTextAI() && intent.action !== 'respond_only'),
+    live: anyLive || hasTextAI(),
+    ...enrichment,
+    plan: plan ?? undefined,
   }
+
+  emit?.({ type: 'done', response })
+  return response
 }

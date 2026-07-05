@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
 import { Card, CardContent } from '@/components/ui/card'
 import type { Lead } from '@/types'
-import { ArrowRight, Building2, User } from 'lucide-react'
+import { ArrowRight, Building2, ExternalLink, User } from 'lucide-react'
 import { cn } from '@/lib/utils'
 
 interface LeadScoreCardProps {
@@ -29,7 +29,19 @@ export function LeadScoreCard({ lead, onAction }: LeadScoreCardProps) {
               <User className="text-violet-200" />
             </div>
             <div>
-              <p className="text-sm font-medium">{lead.name}</p>
+              {lead.profileUrl ? (
+                <a
+                  href={lead.profileUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="text-sm font-medium hover:text-violet-300 inline-flex items-center gap-1"
+                >
+                  {lead.name}
+                  <ExternalLink className="size-3 opacity-70" />
+                </a>
+              ) : (
+                <p className="text-sm font-medium">{lead.name}</p>
+              )}
               <p className="flex items-center gap-1 text-xs text-muted-foreground">
                 <Building2 />
                 {lead.company} · {lead.role}

@@ -21,6 +21,7 @@ import {
   Clock,
   FileText,
   MessageSquare,
+  Mic,
   Megaphone,
   Send,
   Sparkles,
@@ -45,10 +46,11 @@ const heroStats = [
 ] as const
 
 const quickLinks = [
-  { label: 'AI Chat', href: '/dashboard/chat', icon: MessageSquare, desc: 'Prompt-driven control', tint: 'from-violet-500/20 to-violet-500/5 border-violet-500/25' },
+  { label: 'Text Chat', href: '/dashboard/chat', icon: MessageSquare, desc: 'Type prompts & run agents', tint: 'from-violet-500/20 to-violet-500/5 border-violet-500/25' },
+  { label: 'Live Voice', href: '/dashboard/voice', icon: Mic, desc: 'Speak to your AI agent', tint: 'from-rose-500/20 to-rose-500/5 border-rose-500/25' },
   { label: 'Content Studio', href: '/dashboard/content', icon: FileText, desc: 'Generate posts', tint: 'from-blue-500/20 to-blue-500/5 border-blue-500/25' },
   { label: 'Lead Finder', href: '/dashboard/leads', icon: Users, desc: 'Discover prospects', tint: 'from-emerald-500/20 to-emerald-500/5 border-emerald-500/25' },
-  { label: 'Approval Board', href: '/dashboard/approval', icon: CheckSquare, desc: 'Review content', tint: 'from-amber-500/20 to-amber-500/5 border-amber-500/25' },
+  { label: 'Approve & Publish', href: '/dashboard/approval', icon: CheckSquare, desc: 'Review & publish', tint: 'from-amber-500/20 to-amber-500/5 border-amber-500/25' },
 ]
 
 function getWorkflowActiveIndex(agents: { status: string }[]): number {
@@ -431,7 +433,7 @@ export default function OverviewPage() {
               Publish Logs
             </h2>
             <Button asChild variant="ghost" size="sm" className="text-sm">
-              <Link href="/dashboard/publishing">Publishing Center</Link>
+              <Link href="/dashboard/approval?tab=publishing">Approve & Publish</Link>
             </Button>
           </div>
           <PublishLogTable logs={publishLogs.slice(0, 5)} />

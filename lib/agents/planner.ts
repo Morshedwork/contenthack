@@ -86,8 +86,23 @@ const PHRASE_RULES: PhraseRule[] = [
     priority: 84,
   },
   {
+    pattern: /\breels? from content\b|\bcontent to reels?\b|\bconvert (?:posts?|content) to reels?\b/i,
+    agents: ['content', 'video', 'safety', 'scheduler'],
+    priority: 86,
+  },
+  {
+    pattern: /\bpromotion reels?\b|\bpromo reels?\b|\bpromotional (?:video|reels?)\b/i,
+    agents: ['video', 'safety', 'scheduler'],
+    priority: 86,
+  },
+  {
+    pattern: /\bfull reel campaign\b|\breel campaign pipeline\b|\breels? end[\s-]to[\s-]end\b/i,
+    agents: ['strategy', 'content', 'video', 'safety', 'scheduler'],
+    priority: 87,
+  },
+  {
     pattern: /\bvideo scripts?\b|\bshort[\s-]form video\b|\breels? scripts?\b/i,
-    agents: ['video'],
+    agents: ['video', 'safety', 'scheduler'],
     priority: 84,
   },
   {
@@ -288,6 +303,54 @@ export function resolveAgentPlan(
   }
 
   return sortPipeline(expanded)
+}
+
+/**
+ * Autonomous expansion — adds foundation agents when the goal needs workspace data
+ * the user didn't explicitly name (agentic mode).
+ */
+export function resolveAgenticPlan(
+  requestedIds: AgentId[],
+  message: string,
+  ws: WorkspaceSnapshot,
+): AgentId[] {
+  let plan = resolveAgentPlan(requestedIds, message, ws)
+
+  const outcomeGoal =
+    /\b(launch|ready to publish|go live|full campaign|end[\s-]to[\s-]end|complete|pipeline|everything)\b/i.test(
+      message,
+    )
+
+  if (plan.includes('content') && !plan.includes('strategy') && ws.topicCount === 0) {
+    plan = sortPipeline(['strategy', ...plan])
+  }
+
+  if (
+    plan.includes('content') &&
+    !plan.includes('research') &&
+    !ws.hasResearch &&
+    (outcomeGoal || /\bmarket\b|\bcompetitor\b|\btarget audience\b|\bregion\b/i.test(message))
+  ) {
+    plan = sortPipeline(['research', ...plan])
+  }
+
+  if (plan.includes('outreach') && !plan.includes('leadfinder') && ws.leadCount === 0) {
+    plan = sortPipeline(['leadfinder', ...plan])
+  }
+
+  if (
+    (plan.includes('scheduler') || plan.includes('publisher')) &&
+    !plan.includes('content') &&
+    ws.draftCount === 0
+  ) {
+    plan = sortPipeline(['content', ...plan])
+  }
+
+  if (plan.includes('safety') && !plan.includes('content') && ws.draftCount === 0) {
+    plan = sortPipeline(['content', ...plan])
+  }
+
+  return plan
 }
 
 export function describeAgentPlan(agentIds: AgentId[], catalog: ReadonlyArray<{ id: string; name: string }>): string {

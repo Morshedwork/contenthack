@@ -1,7 +1,7 @@
 import 'server-only'
 
 import type { AgentDefinition, AgentStatus } from '@/types'
-import { generateResearch, generateContentDrafts, generateVideoScripts, generateLeads, generateOutreach, checkBrandSafety } from '@/lib/ai/generate'
+import { generateResearch, generateContentDrafts, generateVideoScripts, generateReelsFromContent, generatePromotionReels, generateLeads, generateOutreach, checkBrandSafety } from '@/lib/ai/generate'
 import { mergeCrustdataSignals } from '@/lib/ai/crustdata'
 import { extractBrandThemeFromUrl, isValidCompanyUrl } from '@/lib/ai/brand-theme'
 import { normalizeCustomPromptDetails, platformsFromPromptHint } from '@/lib/ai/prompt-utils'
@@ -19,6 +19,15 @@ import {
 } from '@/lib/workspace/store'
 import { resolveWorkspaceContext, type WorkspaceContext } from '@/lib/workspace/context'
 import { demoAgents } from '@/lib/demo/data'
+import type { VideoAgentContext } from '@/lib/agents/video-pipeline'
+
+export interface AgentRunOptions {
+  customPromptDetails?: string
+  allowAnonymous?: boolean
+  url?: string
+  videoContext?: VideoAgentContext
+  reviewVideoScripts?: boolean
+}
 
 const taskId = (agentId: string) => `task-${agentId}-${Date.now().toString(36)}`
 
@@ -73,7 +82,7 @@ async function recordTask(
 
 export async function runAgentTask(
   agentId: string,
-  options?: { customPromptDetails?: string; allowAnonymous?: boolean; url?: string },
+  options?: AgentRunOptions,
 ): Promise<{ agent: AgentDefinition; live: boolean }> {
   const ctx = await resolveWorkspaceContext({ allowAnonymous: options?.allowAnonymous })
   const ws = await getWorkspace(ctx)
@@ -210,12 +219,79 @@ export async function runAgentTask(
         break
       }
       case 'video': {
+        const vc = options?.videoContext
+        if (vc?.mode === 'content') {
+          await setAgentRunning(ctx, agentId, 'Reels from content drafts', routing)
+          const ids = vc.contentDraftIds ?? []
+          const drafts =
+            ids.length > 0
+              ? ws.contentDrafts.filter((d) => ids.includes(d.id))
+              : ws.contentDrafts.slice(0, 5)
+          if (!drafts.length) {
+            await setAgentFailed(ctx, agentId, 'No content drafts — run Content Agent first')
+            throw new Error('No content drafts available')
+          }
+          const { result, live: aiLive } = await withAI(() =>
+            generateReelsFromContent({
+              contentDrafts: drafts,
+              format: vc.format ?? 'reel',
+              customPromptDetails,
+              brandProfile: ws.brandProfile,
+              research: ws.research,
+              signals: mergeCrustdataSignals({}, ws.brandProfile, ws.research, campaign),
+              modelConfig: modelFor(agentId),
+            }),
+          )
+          live = aiLive
+          const videoScripts = vc.mergeScripts
+            ? [...result, ...(ws.videoScripts ?? [])]
+            : result
+          await patchWorkspace({ videoScripts }, ctx)
+          await setAgentDone(
+            ctx,
+            agentId,
+            `${result.length} reel script${result.length === 1 ? '' : 's'} from ${drafts.length} content draft${drafts.length === 1 ? '' : 's'}`,
+            88,
+          )
+          await recordTask(ctx, agent.name, 'Content-to-reel adaptation', 'completed', result[0]?.hook ?? 'Reels ready', '1.5 hrs')
+          break
+        }
+        if (vc?.mode === 'promotion') {
+          await setAgentRunning(ctx, agentId, 'Promotion reel scripts', routing)
+          const count = vc.count ?? 3
+          const { result, live: aiLive } = await withAI(() =>
+            generatePromotionReels({
+              promotionType: vc.promotionType ?? 'lead_gen',
+              topic: vc.topic,
+              count,
+              format: vc.format ?? 'reel',
+              customPromptDetails,
+              brandProfile: ws.brandProfile,
+              research: ws.research,
+              signals: mergeCrustdataSignals({ topic: vc.topic }, ws.brandProfile, ws.research, campaign),
+              modelConfig: modelFor(agentId),
+            }),
+          )
+          live = aiLive
+          const videoScripts = vc.mergeScripts
+            ? [...result, ...(ws.videoScripts ?? [])]
+            : result
+          await patchWorkspace({ videoScripts }, ctx)
+          await setAgentDone(
+            ctx,
+            agentId,
+            `${result.length} promotion reel variant${result.length === 1 ? '' : 's'} ready`,
+            87,
+          )
+          await recordTask(ctx, agent.name, 'Promotion reel pack', 'completed', result[0]?.hook ?? 'Promo reels ready', '1.8 hrs')
+          break
+        }
         await setAgentRunning(ctx, agentId, 'Short-form video scripts', routing)
-        const topic = ws.topics[0]?.title
+        const topic = vc?.topic ?? ws.topics[0]?.title
         const { result, live: aiLive } = await withAI(() =>
           generateVideoScripts({
             topic,
-            count: 3,
+            count: vc?.count ?? 3,
             customPromptDetails,
             brandProfile: ws.brandProfile,
             research: ws.research,
@@ -224,15 +300,26 @@ export async function runAgentTask(
           }),
         )
         live = aiLive
-        await patchWorkspace({ videoScripts: result }, ctx)
+        const videoScripts = vc?.mergeScripts
+          ? [...result.map((s) => ({ ...s, format: vc.format ?? 'reel' })), ...(ws.videoScripts ?? [])]
+          : result.map((s) => ({ ...s, format: vc?.format ?? 'reel' }))
+        await patchWorkspace({ videoScripts }, ctx)
         await setAgentDone(ctx, agentId, `${result.length} video scripts with scene breakdowns`, 86)
         await recordTask(ctx, agent.name, 'Video script pack', 'completed', result[0]?.hook ?? 'Scripts ready', '2.0 hrs')
         break
       }
       case 'safety': {
         await setAgentRunning(ctx, agentId, 'Compliance & risk checks', routing)
+        const scripts = ws.videoScripts
+        const scriptContent =
+          options?.reviewVideoScripts && scripts.length > 0
+            ? scripts
+                .slice(0, 5)
+                .map((s) => `[${s.title}]\nHook: ${s.hook}\nVoiceover: ${s.voiceover}\nCTA: ${s.cta}`)
+                .join('\n\n')
+            : ''
         const draft = ws.contentDrafts[0]
-        const content = draft ? `${draft.hook}\n${draft.mainCopy}` : ''
+        const content = scriptContent || (draft ? `${draft.hook}\n${draft.mainCopy}` : '')
         const { result, live: aiLive } = await withAI(() =>
           checkBrandSafety({
             content,
@@ -374,7 +461,7 @@ export async function runAgentTask(
   return { agent: updated, live: live || hasTextAI() }
 }
 
-const WORKFLOW_ORDER = [
+export const WORKFLOW_ORDER = [
   'research',
   'strategy',
   'content',
@@ -389,27 +476,63 @@ const WORKFLOW_ORDER = [
 
 export async function executeFullWorkflow(
   customPromptDetails?: string,
-  options?: { allowAnonymous?: boolean },
+  options?: {
+    allowAnonymous?: boolean
+    signal?: AbortSignal
+    onAgentStep?: (payload: {
+      agentId: string
+      agentName: string
+      status: string
+      lastOutput: string
+    }) => void
+  },
 ): Promise<{
   workflowId: string
   steps: { agentId: string; agentName: string; status: string; progress: number }[]
   estimatedTimeSaved: string
   agents: AgentDefinition[]
   live: boolean
+  aborted?: boolean
 }> {
   const ctx = await resolveWorkspaceContext({ allowAnonymous: options?.allowAnonymous })
   const workflowId = `wf-${Date.now()}`
   let anyLive = false
+  let aborted = false
 
   for (const agentId of WORKFLOW_ORDER) {
+    if (options?.signal?.aborted) {
+      aborted = true
+      break
+    }
     const ws = await getWorkspace(ctx)
     const agent = ws.agents.find((a) => a.id === agentId)
     if (!agent) continue
+    options?.onAgentStep?.({
+      agentId,
+      agentName: agent.name,
+      status: 'running',
+      lastOutput: agent.currentTask || 'Starting…',
+    })
     try {
-      const { live } = await runAgentTask(agentId, { customPromptDetails, allowAnonymous: options?.allowAnonymous })
+      const { agent: updated, live } = await runAgentTask(agentId, {
+        customPromptDetails,
+        allowAnonymous: options?.allowAnonymous,
+      })
       if (live) anyLive = true
+      options?.onAgentStep?.({
+        agentId: updated.id,
+        agentName: updated.name,
+        status: updated.status,
+        lastOutput: updated.lastOutput,
+      })
     } catch {
-      // continue pipeline — agent marked failed in store
+      const failed = ws.agents.find((a) => a.id === agentId)
+      options?.onAgentStep?.({
+        agentId,
+        agentName: failed?.name ?? agentId,
+        status: 'failed',
+        lastOutput: 'Agent run failed',
+      })
     }
   }
 
@@ -444,5 +567,6 @@ export async function executeFullWorkflow(
     estimatedTimeSaved: `${hours} hours`,
     agents: finalWs.agents,
     live: anyLive,
+    aborted: aborted || undefined,
   }
 }

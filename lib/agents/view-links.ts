@@ -26,7 +26,7 @@ export const AGENT_VIEW_LINKS: Record<string, AgentViewLink> = {
   video: { href: '/dashboard/video', label: 'View video scripts', icon: Video },
   safety: { href: '/dashboard/approval', label: 'View approvals', icon: CheckSquare },
   scheduler: { href: '/dashboard/calendar', label: 'View calendar', icon: Calendar },
-  publisher: { href: '/dashboard/publishing', label: 'View publishing', icon: Megaphone },
+  publisher: { href: '/dashboard/approval?tab=publishing', label: 'View publishing', icon: Megaphone },
   leadfinder: { href: '/dashboard/leads', label: 'View leads', icon: Users },
   outreach: { href: '/dashboard/outreach', label: 'View outreach', icon: Send },
   analytics: { href: '/dashboard/analytics', label: 'View analytics', icon: BarChart3 },

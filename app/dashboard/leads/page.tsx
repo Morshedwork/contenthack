@@ -168,6 +168,7 @@ export default function LeadsPage() {
             <thead>
               <tr className="border-b border-border text-left text-muted-foreground">
                 <th className="pb-2 pr-4 font-medium">Name</th>
+                <th className="pb-2 pr-4 font-medium">Profile</th>
                 <th className="pb-2 pr-4 font-medium">Company</th>
                 <th className="pb-2 pr-4 font-medium">Role</th>
                 <th className="pb-2 pr-4 font-medium">Platform</th>
@@ -179,7 +180,34 @@ export default function LeadsPage() {
             <tbody>
               {filtered.map((lead) => (
                 <tr key={lead.id} className="border-b border-border/50">
-                  <td className="py-2.5 pr-4 font-medium">{lead.name}</td>
+                  <td className="py-2.5 pr-4 font-medium">
+                    {lead.profileUrl ? (
+                      <a
+                        href={lead.profileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="hover:text-violet-300 inline-flex items-center gap-1"
+                      >
+                        {lead.name}
+                      </a>
+                    ) : (
+                      lead.name
+                    )}
+                  </td>
+                  <td className="py-2.5 pr-4">
+                    {lead.profileUrl ? (
+                      <a
+                        href={lead.profileUrl}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="text-xs text-violet-300 hover:underline inline-flex items-center gap-1 max-w-[160px] truncate"
+                      >
+                        View profile
+                      </a>
+                    ) : (
+                      <span className="text-xs text-muted-foreground">—</span>
+                    )}
+                  </td>
                   <td className="py-2.5 pr-4">{lead.company}</td>
                   <td className="py-2.5 pr-4 text-muted-foreground">{lead.role}</td>
                   <td className="py-2.5 pr-4 capitalize">{lead.platform}</td>

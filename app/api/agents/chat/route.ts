@@ -18,7 +18,7 @@ export async function POST(request: Request) {
     const result =
       mode === 'basic'
         ? await handleBasicChat(messages, wsOptions)
-        : await handleAgentChat(messages, wsOptions)
+        : await handleAgentChat(messages, { ...wsOptions, signal: request.signal })
     return apiSuccess(result)
   } catch (err) {
     return apiFromError(err, 'Chat request failed')
