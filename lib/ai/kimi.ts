@@ -22,6 +22,11 @@ function getKimi(): OpenAI {
   return client
 }
 
+/** Used by the layered AI router for Kimi text/JSON completions. */
+export function getKimiClient(): OpenAI {
+  return getKimi()
+}
+
 export interface KimiImagePrompt {
   enhancedPrompt: string
   style: string

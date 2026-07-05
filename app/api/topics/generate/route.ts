@@ -1,5 +1,5 @@
 import { apiFromError, apiSuccess } from '@/lib/api-utils'
-import { withOpenAI } from '@/lib/ai/openai'
+import { withAI } from '@/lib/ai/layer'
 import { mergeCrustdataSignals } from '@/lib/ai/crustdata'
 import { generateTopics } from '@/lib/ai/generate'
 import { MODEL_TASK, resolveTaskModel } from '@/lib/models/routing'
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     const ctx = await resolveApiWorkspaceContext(request)
     const ws = await getWorkspace(ctx)
     const modelConfig = resolveTaskModel(MODEL_TASK.CONTENT_GENERATION, ws.modelRouting)
-    const { result: topicTitles, live } = await withOpenAI(() =>
+    const { result: topicTitles, live } = await withAI(() =>
       generateTopics({
         goal: body.goal,
         count: body.count,

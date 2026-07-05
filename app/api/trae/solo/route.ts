@@ -1,7 +1,7 @@
 import { apiError, apiFromError, apiSuccess } from '@/lib/api-utils'
 import { mergeCrustdataSignals } from '@/lib/ai/crustdata'
 import { generateContentDrafts } from '@/lib/ai/generate'
-import { withOpenAI } from '@/lib/ai/openai'
+import { withAI } from '@/lib/ai/layer'
 import { runTraeSoloTopicGeneration, TRAE_SOLO_CAPABILITIES, validateTopicBrief } from '@/lib/trae/solo'
 import { MODEL_TASK, resolveTaskModel } from '@/lib/models/routing'
 import { resolveApiWorkspaceContext } from '@/lib/workspace/api-context'
@@ -72,7 +72,7 @@ export async function POST(request: Request) {
         if (!topic?.title) return apiError('topic with title is required for generate_content', 400)
 
         const contentModelConfig = resolveTaskModel(MODEL_TASK.CONTENT_GENERATION, ws.modelRouting)
-        const { result: drafts, live } = await withOpenAI(() =>
+        const { result: drafts, live } = await withAI(() =>
           generateContentDrafts({
             platform,
             topic: topic.title,

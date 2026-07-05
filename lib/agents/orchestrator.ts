@@ -1,8 +1,17 @@
 import 'server-only'
 
 import { runAgentTask, executeFullWorkflow } from '@/lib/agents/engine'
+import {
+  buildWorkspaceSnapshot,
+  describeAgentPlan,
+  matchAgentsFromMessage,
+  resolveAgentPlan,
+  type AgentId,
+  type WorkspaceSnapshot,
+} from '@/lib/agents/planner'
 import { normalizeCustomPromptDetails } from '@/lib/ai/prompt-utils'
-import { generateJSON, generateText, getOpenAI, hasOpenAI, withOpenAI } from '@/lib/ai/openai'
+import { generateJSON, generateText, generateChat, hasTextAI, withAI } from '@/lib/ai/layer'
+import { MODEL_TASK, resolveTaskModel } from '@/lib/models/routing'
 import type { ChatActionExecuted, ChatMessage, ChatMode, ChatResponse } from '@/lib/agents/types'
 import { getWorkspace, patchWorkspace } from '@/lib/workspace/store'
 import { resolveWorkspaceContext } from '@/lib/workspace/context'
@@ -22,7 +31,7 @@ export const AGENT_CATALOG = [
   { id: 'analytics', name: 'Analytics Agent', description: 'ROI reports, performance metrics, hours saved' },
 ] as const
 
-export type AgentId = (typeof AGENT_CATALOG)[number]['id']
+export type { AgentId } from '@/lib/agents/planner'
 
 interface ParsedIntent {
   action: 'run_agents' | 'run_full_workflow' | 'get_status' | 'set_custom_prompt' | 'respond_only'
@@ -51,9 +60,9 @@ function buildWorkspaceSummary(ws: Awaited<ReturnType<typeof getWorkspace>>): st
 }
 
 function parseIntentFallback(message: string): ParsedIntent {
-  const lower = message.toLowerCase()
+  const match = matchAgentsFromMessage(message)
 
-  if (/full workflow|run everything|end.to.end|complete pipeline|all agents/.test(lower)) {
+  if (match.kind === 'full_workflow') {
     return {
       action: 'run_full_workflow',
       agentIds: [],
@@ -62,7 +71,7 @@ function parseIntentFallback(message: string): ParsedIntent {
     }
   }
 
-  if (/status|how are|what('s| is) running|agent status|progress/.test(lower)) {
+  if (match.kind === 'status') {
     return {
       action: 'get_status',
       agentIds: [],
@@ -71,31 +80,12 @@ function parseIntentFallback(message: string): ParsedIntent {
     }
   }
 
-  const matched: string[] = []
-  const keywords: Record<string, string[]> = {
-    research: ['research', 'market', 'competitor', 'trend', 'analysis'],
-    strategy: ['strategy', 'topic', 'pillar', 'content plan'],
-    content: ['content', 'post', 'caption', 'linkedin', 'social'],
-    brandtheme: ['brand theme', 'brand color', 'extract theme', 'company url', 'palette', 'visual identity'],
-    video: ['video', 'reel', 'script', 'short-form'],
-    safety: ['safety', 'compliance', 'brand check', 'review content'],
-    scheduler: ['schedule', 'calendar', 'timing'],
-    publisher: ['publish', 'posting', 'go live'],
-    leadfinder: ['lead', 'prospect', 'find leads'],
-    outreach: ['outreach', 'email', 'connection request', 'message lead'],
-    analytics: ['analytics', 'roi', 'report', 'performance', 'metrics'],
-  }
-
-  for (const [id, words] of Object.entries(keywords)) {
-    if (words.some((w) => lower.includes(w))) matched.push(id)
-  }
-
-  if (matched.length > 0) {
+  if (match.kind === 'agents' && match.agentIds.length > 0) {
     return {
       action: 'run_agents',
-      agentIds: matched,
+      agentIds: match.agentIds,
       customPromptDetails: message,
-      assistantMessage: `Running ${matched.map((id) => AGENT_CATALOG.find((a) => a.id === id)?.name ?? id).join(', ')}.`,
+      assistantMessage: describeAgentPlan(match.agentIds, AGENT_CATALOG),
     }
   }
 
@@ -104,42 +94,55 @@ function parseIntentFallback(message: string): ParsedIntent {
     agentIds: [],
     customPromptDetails: '',
     assistantMessage:
-      'I can run any of your content ops agents by prompt. Try: "Run market research for Japan SMEs", "Generate LinkedIn posts", "Find leads and draft outreach", or "Run the full workflow".',
+      'Tell me exactly what you need — one task at a time works best. Try: "Run market research", "Generate LinkedIn posts", "Find leads and draft outreach", or "Run the full workflow" when you want every agent.',
   }
 }
 
-async function parseIntent(message: string, workspaceSummary: string, history: ChatMessage[]): Promise<ParsedIntent> {
+async function parseIntent(
+  message: string,
+  workspaceSummary: string,
+  history: ChatMessage[],
+  wsSnapshot: WorkspaceSnapshot,
+  modelRouting?: import('@/types').ModelRouting[],
+): Promise<ParsedIntent> {
   const agentList = AGENT_CATALOG.map((a) => `- ${a.id}: ${a.name} — ${a.description}`).join('\n')
   const historyText = history
     .slice(-6)
     .map((m) => `${m.role}: ${m.content}`)
     .join('\n')
 
+  const orchestratorModel = resolveTaskModel(MODEL_TASK.ANALYTICS_SUMMARY, modelRouting)
+
   let result: ParsedIntent
   try {
-    const parsed = await withOpenAI(() =>
+    const parsed = await withAI(() =>
       generateJSON<ParsedIntent>({
-        model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+        model: orchestratorModel.model,
+        fallbackModel: orchestratorModel.fallbackModel,
+        modelChain: orchestratorModel.modelChain,
         temperature: 0.2,
         maxTokens: 800,
-        system: `You are the ContentOps AI orchestrator. Parse user requests into agent actions.
+        system: `You are the ContentOps AI orchestrator. Parse user requests into the MINIMUM agent actions needed.
 
 Available agents:
 ${agentList}
 
 Actions:
-- run_agents: run one or more specific agents (set agentIds)
-- run_full_workflow: run the entire pipeline in order
-- get_status: summarize current agent/workspace status
+- run_agents: run one or more specific agents (set agentIds) — prefer ONE agent when the request is single-purpose
+- run_full_workflow: ONLY when the user explicitly asks for the full pipeline / everything / end-to-end
+- get_status: summarize current agent/workspace status (no agent execution)
 - set_custom_prompt: save standing instructions for future agent runs (use customPromptDetails)
 - respond_only: answer without running agents (help, clarification, general questions)
 
 Rules:
+- DEFAULT TO MINIMAL: "Generate LinkedIn posts" → content only. "Market research" → research only.
+- Do NOT run all agents unless the user clearly asks for full workflow / entire pipeline / everything.
+- Do NOT add research, strategy, or safety as "helpful extras" unless the user chained steps ("research then write posts") or named that agent.
+- Multi-agent runs are allowed ONLY when the user explicitly combines tasks ("find leads and draft outreach", "research then content").
 - Extract operational instructions into customPromptDetails (tone, region, offer focus, word limits, etc.)
-- For multi-step requests like "research then write posts", include all needed agentIds in pipeline order
-- For "everything" or "full campaign" requests, use run_full_workflow
 - agentIds must only use valid ids: ${[...VALID_AGENT_IDS].join(', ')}
-- Keep assistantMessage concise and action-oriented
+- Order agentIds in pipeline order when multiple are truly needed: research → strategy → content → video → safety → scheduler → publisher → leadfinder → outreach → analytics
+- Keep assistantMessage concise — name only the agents you will actually run
 
 Return JSON: { "action", "agentIds", "customPromptDetails", "assistantMessage" }`,
         user: `Workspace state:\n${workspaceSummary}\n\nRecent chat:\n${historyText || 'none'}\n\nUser message: ${message}`,
@@ -150,8 +153,8 @@ Return JSON: { "action", "agentIds", "customPromptDetails", "assistantMessage" }
     result = parseIntentFallback(message)
   }
 
-  const agentIds = (result.agentIds ?? []).filter((id) => VALID_AGENT_IDS.has(id))
-  const action = ['run_agents', 'run_full_workflow', 'get_status', 'set_custom_prompt', 'respond_only'].includes(
+  let agentIds = (result.agentIds ?? []).filter((id): id is AgentId => VALID_AGENT_IDS.has(id))
+  let action = ['run_agents', 'run_full_workflow', 'get_status', 'set_custom_prompt', 'respond_only'].includes(
     result.action,
   )
     ? result.action
@@ -159,14 +162,43 @@ Return JSON: { "action", "agentIds", "customPromptDetails", "assistantMessage" }
       ? 'run_agents'
       : 'respond_only'
 
+  // Guard: models sometimes pick run_full_workflow without an explicit ask.
+  if (action === 'run_full_workflow') {
+    const explicitFull =
+      matchAgentsFromMessage(message).kind === 'full_workflow' ||
+      /\bfull workflow\b|\brun everything\b|\bend[\s-]to[\s-]end\b|\bcomplete pipeline\b|\ball agents\b|\bentire pipeline\b/i.test(
+        message,
+      )
+    if (!explicitFull) {
+      if (agentIds.length > 0) {
+        action = 'run_agents'
+      } else {
+        const phrase = matchAgentsFromMessage(message)
+        if (phrase.kind === 'agents' && phrase.agentIds.length > 0) {
+          action = 'run_agents'
+          agentIds = phrase.agentIds
+        } else {
+          action = 'respond_only'
+          agentIds = []
+        }
+      }
+    }
+  }
+
+  if (action === 'run_agents' && agentIds.length > 0) {
+    agentIds = resolveAgentPlan(agentIds, message, wsSnapshot)
+  }
+
   return {
     action,
     agentIds,
     customPromptDetails: normalizeCustomPromptDetails(result.customPromptDetails) ?? '',
     assistantMessage:
-      typeof result.assistantMessage === 'string'
-        ? result.assistantMessage
-        : 'Done.',
+      action === 'run_agents' && agentIds.length > 0
+        ? describeAgentPlan(agentIds, AGENT_CATALOG)
+        : typeof result.assistantMessage === 'string'
+          ? result.assistantMessage
+          : 'Done.',
   }
 }
 
@@ -199,7 +231,7 @@ async function summarizeResults(
   actionsExecuted: ChatActionExecuted[],
   ws: Awaited<ReturnType<typeof getWorkspace>>,
 ): Promise<string> {
-  if (!hasOpenAI()) {
+  if (!hasTextAI()) {
     if (intent.action === 'get_status') return buildStatusMessage(ws)
     const ran = actionsExecuted.flatMap((a) => a.results ?? [])
     if (ran.length === 0) return intent.assistantMessage
@@ -210,8 +242,12 @@ async function summarizeResults(
     ].join('\n')
   }
 
-  const { result } = await withOpenAI(() =>
+  const chatModel = resolveTaskModel(MODEL_TASK.ANALYTICS_SUMMARY, ws.modelRouting)
+  const { result } = await withAI(() =>
     generateText({
+      model: chatModel.model,
+      fallbackModel: chatModel.fallbackModel,
+      modelChain: chatModel.modelChain,
       temperature: 0.5,
       maxTokens: 600,
       system: `You are ContentOps AI assistant. Summarize agent execution results for the user in a friendly, concise way. Use markdown sparingly (bold for agent names). Be specific about what was produced.`,
@@ -230,21 +266,23 @@ export async function handleBasicChat(
   const ws = await getWorkspace(ctx)
   const campaign = ws.campaign
 
-  if (!hasOpenAI()) {
+  if (!hasTextAI()) {
     return {
       message:
-        'Basic chat needs **OPENAI_API_KEY** configured. You can still use **Agent Mode** for demo pipeline actions, or add your API key in `.env.local`.',
+        'Basic chat needs an AI provider configured (**OPENAI_API_KEY** or **KIMI_API_KEY**). You can still use **Agent Mode** for demo pipeline actions, or add a key in `.env.local`.',
       actionsExecuted: [],
       agents: ws.agents,
       live: false,
     }
   }
 
-  const openai = getOpenAI()
-  const completion = await openai.chat.completions.create({
-    model: process.env.OPENAI_MODEL || 'gpt-4o-mini',
+  const chatModel = resolveTaskModel(MODEL_TASK.CONTENT_GENERATION, ws.modelRouting)
+  const message = await generateChat({
+    model: chatModel.model,
+    fallbackModel: chatModel.fallbackModel,
+    modelChain: chatModel.modelChain,
     temperature: 0.7,
-    max_tokens: 1024,
+    maxTokens: 1024,
     messages: [
       {
         role: 'system',
@@ -267,7 +305,7 @@ Keep replies concise, practical, and actionable.`,
   })
 
   return {
-    message: completion.choices[0]?.message?.content?.trim() || 'I could not generate a response.',
+    message: message || 'I could not generate a response.',
     actionsExecuted: [],
     agents: ws.agents,
     live: true,
@@ -284,7 +322,14 @@ export async function handleAgentChat(
   if (!lastUser) throw new Error('No user message provided')
 
   const workspaceSummary = buildWorkspaceSummary(ws)
-  const intent = await parseIntent(lastUser.content, workspaceSummary, messages.slice(0, -1))
+  const wsSnapshot = buildWorkspaceSnapshot(ws)
+  const intent = await parseIntent(
+    lastUser.content,
+    workspaceSummary,
+    messages.slice(0, -1),
+    wsSnapshot,
+    ws.modelRouting,
+  )
 
   const actionsExecuted: ChatActionExecuted[] = []
   let anyLive = false
@@ -318,7 +363,7 @@ export async function handleAgentChat(
     })
     const finalWs = await getWorkspace(ctx)
     const message = await summarizeResults(intent, actionsExecuted, finalWs)
-    return { message, actionsExecuted, agents, live: anyLive || hasOpenAI() }
+    return { message, actionsExecuted, agents, live: anyLive || hasTextAI() }
   }
 
   if (intent.action === 'run_agents' && intent.agentIds.length > 0) {
@@ -360,6 +405,6 @@ export async function handleAgentChat(
     message,
     actionsExecuted,
     agents: finalWs.agents,
-    live: anyLive || (hasOpenAI() && intent.action !== 'respond_only'),
+    live: anyLive || (hasTextAI() && intent.action !== 'respond_only'),
   }
 }

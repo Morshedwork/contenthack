@@ -28,7 +28,9 @@ export async function GET() {
     },
     configured: configuredEnvVarNames(),
     stack: {
-      text: providers.openai ? 'openai' : null,
+      text: providers.textAI
+        ? [providers.openai && 'openai', providers.kimi && 'kimi'].filter(Boolean).join('+') || 'layered'
+        : null,
       data: providers.crustdata ? 'crustdata' : null,
       imagePrompt: media.kimi ? 'kimi' : media.openai ? 'openai' : null,
       imageRender: media.openai ? 'openai' : 'pollinations',

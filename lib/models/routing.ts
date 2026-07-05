@@ -1,7 +1,7 @@
 import { demoModelRouting } from '@/lib/demo/data'
-import { OPENAI_MODEL, OPENAI_MODEL_QUALITY } from '@/lib/ai/openai'
+import { KIMI_MODEL, hasKimi } from '@/lib/ai/kimi'
+import { OPENAI_MODEL, OPENAI_MODEL_QUALITY, hasOpenAI } from '@/lib/ai/openai'
 import { OPENAI_IMAGE_MODEL, normalizeOpenAIImageModel } from '@/lib/ai/openai-image'
-import { KIMI_MODEL } from '@/lib/ai/kimi'
 import type { ModelRouting } from '@/types'
 
 /** Task types aligned with the Model Hub routing table. */
@@ -23,6 +23,8 @@ export interface TaskModelConfig {
   taskType: ModelTaskType
   model: string
   fallbackModel?: string
+  /** Ordered models to try — user routing + cross-provider fallbacks. */
+  modelChain: string[]
   assignedModel: string
   temperature: number
   maxTokens: number
@@ -54,6 +56,39 @@ const QUALITY_TASKS = new Set<ModelTaskType>([
   MODEL_TASK.BRAND_SAFETY,
   MODEL_TASK.OUTREACH_WRITING,
 ])
+
+const KIMI_MODEL_PREFIX = /^kimi/i
+
+function isTextModelAvailable(modelId: string): boolean {
+  return KIMI_MODEL_PREFIX.test(modelId.trim()) ? hasKimi() : hasOpenAI()
+}
+
+function pushUniqueModel(chain: string[], model?: string): void {
+  if (!model?.trim()) return
+  const id = modelDisplayNameToId(model.trim())
+  if (!chain.includes(id) && isTextModelAvailable(id)) chain.push(id)
+}
+
+/** Ordered fallback chain: user primary → user fallback → env defaults → cross-provider. */
+export function buildModelChain(input: {
+  model?: string
+  fallbackModel?: string
+  taskType?: ModelTaskType
+  preferQuality?: boolean
+}): string[] {
+  const chain: string[] = []
+  pushUniqueModel(chain, input.model)
+  pushUniqueModel(chain, input.fallbackModel)
+
+  if (input.preferQuality) pushUniqueModel(chain, OPENAI_MODEL_QUALITY)
+  pushUniqueModel(chain, OPENAI_MODEL)
+  pushUniqueModel(chain, KIMI_MODEL)
+
+  if (hasOpenAI()) pushUniqueModel(chain, OPENAI_MODEL)
+  if (hasKimi()) pushUniqueModel(chain, KIMI_MODEL)
+
+  return chain
+}
 
 function normalizeModelName(name: string): string {
   return name.toLowerCase().replace(/\s+/g, ' ').trim()
@@ -94,11 +129,18 @@ export function resolveTaskModel(
   const fallbackModel = row.fallbackModel
     ? modelDisplayNameToId(row.fallbackModel)
     : undefined
+  const modelChain = buildModelChain({
+    model,
+    fallbackModel,
+    taskType,
+    preferQuality: QUALITY_TASKS.has(taskType),
+  })
 
   return {
     taskType,
     model,
     fallbackModel: fallbackModel && fallbackModel !== model ? fallbackModel : undefined,
+    modelChain,
     assignedModel: row.assignedModel,
     temperature: row.temperature,
     maxTokens: row.maxTokens,

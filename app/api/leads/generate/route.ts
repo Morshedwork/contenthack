@@ -1,5 +1,5 @@
 import { apiFromError, apiSuccess } from '@/lib/api-utils'
-import { withOpenAI } from '@/lib/ai/openai'
+import { withAI } from '@/lib/ai/layer'
 import { mergeCrustdataSignals } from '@/lib/ai/crustdata'
 import { generateLeads } from '@/lib/ai/generate'
 import { MODEL_TASK, resolveTaskModel } from '@/lib/models/routing'
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     const ws = await getWorkspace(ctx)
     const modelConfig = resolveTaskModel(MODEL_TASK.LEAD_SCORING, ws.modelRouting)
 
-    const { result: leads, live } = await withOpenAI(() =>
+    const { result: leads, live } = await withAI(() =>
       generateLeads({
         count: body.count ?? 10,
         criteria: body.criteria || ws.research?.marketSummary || ws.campaign.targetAudience,

@@ -1,7 +1,5 @@
 import { demoModels, demoModelRouting } from '@/lib/demo/data'
 import type { AIModel, ModelRouting } from '@/types'
-import { generateOutput } from '@/lib/ai/generate'
-import { requireOpenAI } from '@/lib/ai/openai'
 
 export {
   MODEL_TASK,
@@ -58,13 +56,4 @@ export function getModelPerformance() {
     contentQualityScore: 91,
     leadQualityScore: 86,
   }
-}
-
-export async function generateTaskOutput(taskType: string, input: string): Promise<string> {
-  requireOpenAI()
-  return generateOutput(taskType, input)
-}
-
-export function getRequiredEnvVars() {
-  return ['OPENAI_API_KEY', 'CRUSTDATA_API_KEY', 'KIMI_API_KEY', 'PIXVERSE_API_KEY', 'SUPABASE_SERVICE_ROLE_KEY']
 }

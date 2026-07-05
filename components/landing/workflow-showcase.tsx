@@ -31,7 +31,7 @@ const phases = [
   },
 ] as const
 
-const allSteps = phases.flatMap((p) => p.steps)
+const allSteps: readonly string[] = phases.flatMap((p) => p.steps)
 
 const totalSteps = allSteps.length
 

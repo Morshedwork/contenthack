@@ -1,5 +1,5 @@
 import { apiFromError, apiSuccess } from '@/lib/api-utils'
-import { withOpenAI } from '@/lib/ai/openai'
+import { withAI } from '@/lib/ai/layer'
 import { mergeCrustdataSignals } from '@/lib/ai/crustdata'
 import { generateContentDrafts } from '@/lib/ai/generate'
 import { MODEL_TASK, resolveTaskModel } from '@/lib/models/routing'
@@ -37,7 +37,7 @@ export async function POST(request: Request) {
     const platforms = resolvePlatforms(body.platforms, ws.campaign.platforms)
     const modelConfig = resolveTaskModel(MODEL_TASK.CONTENT_GENERATION, ws.modelRouting)
 
-    const { result: drafts, live } = await withOpenAI(() =>
+    const { result: drafts, live } = await withAI(() =>
       generateContentDrafts({
         platform: body.platform,
         platforms,

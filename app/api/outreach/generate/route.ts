@@ -1,5 +1,5 @@
 import { apiFromError, apiSuccess } from '@/lib/api-utils'
-import { withOpenAI } from '@/lib/ai/openai'
+import { withAI } from '@/lib/ai/layer'
 import { mergeCrustdataSignals } from '@/lib/ai/crustdata'
 import { generateOutreach } from '@/lib/ai/generate'
 import { MODEL_TASK, resolveTaskModel } from '@/lib/models/routing'
@@ -14,7 +14,7 @@ export async function POST(request: Request) {
     const lead = ws.leads.find((l) => l.id === body.leadId)
     const modelConfig = resolveTaskModel(MODEL_TASK.OUTREACH_WRITING, ws.modelRouting)
 
-    const { result: outreach, live } = await withOpenAI(() =>
+    const { result: outreach, live } = await withAI(() =>
       generateOutreach({
         leadId: body.leadId,
         leadName: body.leadName || lead?.name,

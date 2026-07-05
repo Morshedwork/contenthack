@@ -1,5 +1,5 @@
 import { apiFromError, apiSuccess } from '@/lib/api-utils'
-import { withOpenAI } from '@/lib/ai/openai'
+import { withAI } from '@/lib/ai/layer'
 import { mergeCrustdataSignals } from '@/lib/ai/crustdata'
 import { generateVideoScripts } from '@/lib/ai/generate'
 import { MODEL_TASK, resolveTaskModel } from '@/lib/models/routing'
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     const ws = await getWorkspace(ctx)
     const modelConfig = resolveTaskModel(MODEL_TASK.VIDEO_SCRIPTS, ws.modelRouting)
 
-    const { result: scripts, live } = await withOpenAI(() =>
+    const { result: scripts, live } = await withAI(() =>
       generateVideoScripts({
         topic: body.topic,
         count: body.count ?? 3,

@@ -2,7 +2,7 @@ import 'server-only'
 
 import type { BrandThemeColor, ExtractedBrandTheme } from '@/types'
 import { normalizeHex } from '@/lib/brand/theme-context'
-import { generateJSON, hasOpenAI } from '@/lib/ai/openai'
+import { generateJSON, hasTextAI } from '@/lib/ai/layer'
 import { crustdataPromptBlock, fetchCompanyEnrichByDomain } from '@/lib/ai/crustdata'
 import { MODEL_TASK, resolveTaskModel, type TaskModelConfig } from '@/lib/models/routing'
 
@@ -202,12 +202,13 @@ export async function extractBrandThemeFromUrl(
     // Fall back to heuristic palette when fetch fails (demo / blocked sites)
   }
 
-  if (hasOpenAI()) {
+  if (hasTextAI()) {
     const mc = modelConfig ?? resolveTaskModel(MODEL_TASK.CONTENT_GENERATION)
     const companyContext = await fetchCompanyEnrichByDomain(hostname)
     const analysis = await generateJSON<ThemeAnalysis>({
       model: mc.model,
       fallbackModel: mc.fallbackModel,
+      modelChain: mc.modelChain,
       temperature: mc.temperature,
       maxTokens: mc.maxTokens,
       system:

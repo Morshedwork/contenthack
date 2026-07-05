@@ -4,12 +4,103 @@ import { useState, useEffect } from 'react'
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
+import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { CustomPromptPanel } from '@/components/shared/custom-prompt-panel'
 import { useWorkspace } from '@/hooks/use-workspace'
 import type { OutreachMessage } from '@/types'
-import { AlertTriangle, Check, Loader2, Send, Sparkles } from 'lucide-react'
+import { AlertTriangle, Check, Copy, Loader2, Mail, Send, Sparkles } from 'lucide-react'
 import { toast } from 'sonner'
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+function EmailActions({ msg }: { msg: OutreachMessage }) {
+  const [to, setTo] = useState('')
+  const [sending, setSending] = useState(false)
+  const [providerEnabled, setProviderEnabled] = useState<boolean | null>(null)
+
+  useEffect(() => {
+    fetch('/api/email/send')
+      .then((r) => r.json())
+      .then((json) => setProviderEnabled(Boolean(json?.data?.enabled)))
+      .catch(() => setProviderEnabled(false))
+  }, [])
+
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(`Subject: ${msg.emailSubject}\n\n${msg.emailBody}`)
+      toast.success('Email copied — paste it anywhere')
+    } catch {
+      toast.error('Clipboard unavailable — select and copy the text manually')
+    }
+  }
+
+  const mailtoHref = `mailto:${encodeURIComponent(to)}?subject=${encodeURIComponent(msg.emailSubject)}&body=${encodeURIComponent(msg.emailBody)}`
+
+  const handleSend = async () => {
+    if (!EMAIL_RE.test(to.trim())) {
+      toast.error('Enter a valid recipient email address')
+      return
+    }
+    setSending(true)
+    try {
+      const res = await fetch('/api/email/send', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ to: to.trim(), subject: msg.emailSubject, body: msg.emailBody }),
+      })
+      const json = await res.json()
+      if (!res.ok || !json?.success) throw new Error(json?.error || 'Email send failed')
+      toast.success(`Email sent to ${to.trim()}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Email send failed')
+    } finally {
+      setSending(false)
+    }
+  }
+
+  return (
+    <div className="flex flex-col gap-2 rounded-lg border border-border/60 bg-secondary/20 p-3">
+      <p className="text-xs font-medium text-muted-foreground">Send this email</p>
+      <div className="flex flex-col sm:flex-row gap-2">
+        <Input
+          type="email"
+          value={to}
+          onChange={(e) => setTo(e.target.value)}
+          placeholder="recipient@company.com"
+          className="h-9 text-sm sm:max-w-xs"
+        />
+        <div className="flex flex-wrap gap-2">
+          {providerEnabled && (
+            <Button size="sm" onClick={() => void handleSend()} disabled={sending || !to.trim()}>
+              {sending ? (
+                <Loader2 className="animate-spin" data-icon="inline-start" />
+              ) : (
+                <Send data-icon="inline-start" />
+              )}
+              Send email
+            </Button>
+          )}
+          <Button size="sm" variant="outline" asChild>
+            <a href={mailtoHref} aria-disabled={!to.trim()}>
+              <Mail data-icon="inline-start" />
+              Open in mail app
+            </a>
+          </Button>
+          <Button size="sm" variant="outline" onClick={() => void handleCopy()}>
+            <Copy data-icon="inline-start" />
+            Copy email
+          </Button>
+        </div>
+      </div>
+      {providerEnabled === false && (
+        <p className="text-[10px] text-muted-foreground">
+          Add RESEND_API_KEY to .env.local for one-click delivery — copy and mail-app options work without it.
+        </p>
+      )}
+    </div>
+  )
+}
 
 export default function OutreachPage() {
   const { data, refresh } = useWorkspace()
@@ -152,18 +243,23 @@ export default function OutreachPage() {
                 <p className="text-xs font-medium text-muted-foreground mb-1">Email Body</p>
                 <p className="text-sm whitespace-pre-line bg-secondary/20 rounded-lg p-3">{msg.emailBody}</p>
               </div>
-              <div className="flex gap-2">
-                {!msg.approved && (
-                  <Button size="sm" onClick={() => toast.success(`Outreach for ${msg.leadName} approved — ready to send manually`)}>
+              {!msg.approved ? (
+                <div className="flex gap-2">
+                  <Button
+                    size="sm"
+                    onClick={() => {
+                      setMessages((prev) =>
+                        prev.map((m) => (m.id === msg.id ? { ...m, approved: true } : m)),
+                      )
+                      toast.success(`Outreach for ${msg.leadName} approved — ready to send`)
+                    }}
+                  >
                     <Check data-icon="inline-start" />Approve for Sending
                   </Button>
-                )}
-                {msg.approved && (
-                  <Button size="sm" variant="outline" onClick={() => toast.info('Copy to clipboard — send manually via LinkedIn/email')}>
-                    <Send data-icon="inline-start" />Copy & Send Manually
-                  </Button>
-                )}
-              </div>
+                </div>
+              ) : (
+                <EmailActions msg={msg} />
+              )}
             </CardContent>
           </Card>
         ))}

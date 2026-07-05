@@ -1,5 +1,5 @@
 import { apiFromError, apiSuccess } from '@/lib/api-utils'
-import { withOpenAI } from '@/lib/ai/openai'
+import { withAI } from '@/lib/ai/layer'
 import { mergeCrustdataSignals } from '@/lib/ai/crustdata'
 import { checkBrandSafety } from '@/lib/ai/generate'
 import { MODEL_TASK, resolveTaskModel } from '@/lib/models/routing'
@@ -13,7 +13,7 @@ export async function POST(request: Request) {
     const ws = await getWorkspace(ctx)
     const content: string = body.content || ''
     const modelConfig = resolveTaskModel(MODEL_TASK.BRAND_SAFETY, ws.modelRouting)
-    const { result, live } = await withOpenAI(() =>
+    const { result, live } = await withAI(() =>
       checkBrandSafety({
         content,
         brandProfile: ws.brandProfile,

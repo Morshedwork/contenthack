@@ -1,6 +1,6 @@
 import { apiError, apiFromError, apiSuccess } from '@/lib/api-utils'
 import { extractBrandThemeFromUrl, isValidCompanyUrl } from '@/lib/ai/brand-theme'
-import { hasOpenAI } from '@/lib/ai/openai'
+import { hasTextAI } from '@/lib/ai/layer'
 import { MODEL_TASK, resolveTaskModel } from '@/lib/models/routing'
 import { getWorkspace, patchWorkspace } from '@/lib/workspace/store'
 import type { BrandProfile } from '@/types'
@@ -26,7 +26,7 @@ export async function POST(request: Request) {
 
     await patchWorkspace({ brandProfile })
 
-    return apiSuccess({ theme, brandProfile, collection, live: hasOpenAI() })
+    return apiSuccess({ theme, brandProfile, collection, live: hasTextAI() })
   } catch (err) {
     return apiFromError(err, 'Brand theme extraction failed')
   }

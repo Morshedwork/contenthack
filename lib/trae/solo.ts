@@ -6,7 +6,7 @@ import type {
   TopicBrief,
   TraeSoloTopicResult,
 } from '@/types'
-import { generateJSON, withOpenAI } from '@/lib/ai/openai'
+import { generateJSON, withAI } from '@/lib/ai/layer'
 import { crustdataPromptBlock, fetchTaskContext, mergeCrustdataSignals, type CrustdataTaskInput } from '@/lib/ai/crustdata'
 import { appendCustomPrompt, normalizeCustomPromptDetails } from '@/lib/ai/prompt-utils'
 import { MODEL_TASK, resolveTaskModel, type TaskModelConfig } from '@/lib/models/routing'
@@ -214,6 +214,7 @@ async function generateTopicsOpenAI(
   const data = await generateJSON<{ topics?: unknown[] }>({
     model: mc.model,
     fallbackModel: mc.fallbackModel,
+    modelChain: mc.modelChain,
     temperature: mc.temperature,
     maxTokens: mc.maxTokens,
     system:
@@ -301,7 +302,7 @@ export async function runTraeSoloTopicGeneration(
     'TRAE Solo: Generating hooks, angles, and format recommendations',
   ]
 
-  const { result: topics } = await withOpenAI(() => generateTopicsOpenAI(brief, modelConfig, research, signals))
+  const { result: topics } = await withAI(() => generateTopicsOpenAI(brief, modelConfig, research, signals))
   if (!topics.length) {
     throw new Error('OpenAI returned no topics — try adding more key points or base content')
   }

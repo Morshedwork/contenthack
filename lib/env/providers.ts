@@ -1,4 +1,6 @@
 import { hasCrustdata } from '@/lib/ai/crustdata'
+import { hasElevenLabs } from '@/lib/ai/elevenlabs'
+import { hasTextAI } from '@/lib/ai/layer'
 import { hasKimi } from '@/lib/ai/kimi'
 import { hasOpenAI } from '@/lib/ai/openai'
 import { hasOpenAIImage, normalizeOpenAIImageModel, OPENAI_IMAGE_MODEL } from '@/lib/ai/openai-image'
@@ -10,9 +12,12 @@ import { hasSupabasePersistence } from '@/lib/workspace/persistence'
 
 export interface AppProviders {
   openai: boolean
-  crustdata: boolean
   kimi: boolean
+  /** At least one text provider (OpenAI and/or Kimi) — layered AI stack. */
+  textAI: boolean
+  crustdata: boolean
   pixverse: boolean
+  elevenlabs: boolean
   supabase: boolean
   supabasePersistence: boolean
   demoMode: boolean
@@ -23,9 +28,11 @@ export interface AppProviders {
 export function getAppProviders(): AppProviders {
   return {
     openai: hasOpenAI(),
-    crustdata: hasCrustdata(),
     kimi: hasKimi(),
+    textAI: hasTextAI(),
+    crustdata: hasCrustdata(),
     pixverse: hasPixverse(),
+    elevenlabs: hasElevenLabs(),
     supabase: hasSupabaseConfig(),
     supabasePersistence: hasSupabasePersistence(),
     demoMode: isDemoMode(),
@@ -57,6 +64,7 @@ export function configuredEnvVarNames(): string[] {
     'CRUSTDATA_API_KEY',
     'KIMI_API_KEY',
     'PIXVERSE_API_KEY',
+    'ELEVENLABS_API_KEY',
     'SUPABASE_SERVICE_ROLE_KEY',
     'NEXT_PUBLIC_SUPABASE_URL',
   ]

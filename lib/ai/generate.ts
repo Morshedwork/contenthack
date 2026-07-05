@@ -14,7 +14,7 @@ import {
   mergeCrustdataSignals,
   type CrustdataTaskInput,
 } from './crustdata'
-import { generateJSON, generateText } from './openai'
+import { generateJSON, generateText } from './layer'
 import { appendCustomPrompt, normalizeCustomPromptDetails, platformsFromPromptHint } from './prompt-utils'
 import { MODEL_TASK, resolveTaskModel, type TaskModelConfig } from '@/lib/models/routing'
 
@@ -117,6 +117,7 @@ export async function generateResearch(input: {
   const data = await generateJSON<Partial<MarketResearch>>({
     model: mc.model,
     fallbackModel: mc.fallbackModel,
+    modelChain: mc.modelChain,
     temperature: mc.temperature,
     maxTokens: mc.maxTokens,
     system: `You are a senior B2B market research analyst. Produce sharp, data-aware insights for a marketing team. When CrustData evidence is provided, treat it as primary source material and ground competitors, trends, and gaps in that data. Always respond with a single valid JSON object and nothing else.`,
@@ -178,6 +179,7 @@ export async function generateTopics(input: {
   const data = await generateJSON<{ topics?: string[] }>({
     model: mc.model,
     fallbackModel: mc.fallbackModel,
+    modelChain: mc.modelChain,
     temperature: mc.temperature,
     maxTokens: mc.maxTokens,
     system: `You are a B2B content strategist. When CrustData evidence is provided, ground topic ideas in real market signals. Respond only with a valid JSON object.`,
@@ -226,6 +228,7 @@ export async function generateContentDrafts(input: {
   const data = await generateJSON<{ drafts?: Partial<ContentDraft>[] }>({
     model: mc.model,
     fallbackModel: mc.fallbackModel,
+    modelChain: mc.modelChain,
     temperature: mc.temperature,
     maxTokens: mc.maxTokens,
     system: `You are an expert social media copywriter. Write platform-native, high-converting posts that respect the brand's tone and content rules. Ground claims in CrustData evidence when provided. Respond only with a valid JSON object.`,
@@ -299,6 +302,7 @@ export async function generateVideoScripts(input: {
   const data = await generateJSON<{ scripts?: Partial<VideoScript>[] }>({
     model: mc.model,
     fallbackModel: mc.fallbackModel,
+    modelChain: mc.modelChain,
     temperature: mc.temperature,
     maxTokens: mc.maxTokens,
     system: `You are a short-form video scriptwriter (Reels, Shorts, TikTok). Use CrustData trend signals when provided. Respond only with a valid JSON object.`,
@@ -364,6 +368,7 @@ export async function generateLeads(input: {
   const data = await generateJSON<{ leads?: Partial<Lead>[] }>({
     model: mc.model,
     fallbackModel: mc.fallbackModel,
+    modelChain: mc.modelChain,
     temperature: mc.temperature,
     maxTokens: Math.max(mc.maxTokens, 4096),
     system: crustdataContext
@@ -430,6 +435,7 @@ export async function generateOutreach(input: {
   const data = await generateJSON<Partial<OutreachMessage>>({
     model: mc.model,
     fallbackModel: mc.fallbackModel,
+    modelChain: mc.modelChain,
     temperature: mc.temperature,
     maxTokens: mc.maxTokens,
     system: `You are an expert B2B outreach copywriter. Write warm, personalized, non-spammy messages grounded in CrustData prospect/company data when provided. Respond only with a valid JSON object.`,
@@ -490,6 +496,7 @@ export async function checkBrandSafety(input: {
   const data = await generateJSON<Partial<SafetyResult>>({
     model: mc.model,
     fallbackModel: mc.fallbackModel,
+    modelChain: mc.modelChain,
     temperature: mc.temperature,
     maxTokens: mc.maxTokens,
     system: `You are a brand safety and compliance reviewer. Detect risky claims, unverifiable guarantees, spammy phrasing, and off-brand language. Use CrustData fact-check signals when provided. Respond only with a valid JSON object.`,
@@ -537,6 +544,7 @@ export async function generateOutput(
   return generateText({
     model: mc.model,
     fallbackModel: mc.fallbackModel,
+    modelChain: mc.modelChain,
     temperature: mc.temperature,
     maxTokens: mc.maxTokens,
     system: `You are an AI marketing agent specialized in "${taskType}". Ground analysis in CrustData when provided. ${brandContext}`,

@@ -1,0 +1,61 @@
+---
+description: gstack engineering workflow + ContentOps multi-agent integration
+alwaysApply: true
+---
+
+# gstack + ContentOps AI
+
+This repo uses [GStack + GBrain](https://github.com/garrytan/gstack) for **engineering quality and memory**, and ContentOps' 11 agents for **marketing operations**.
+
+**Installed:** gstack at `~/.cursor/skills/gstack` (55 skills) · gbrain PGLite at `~/.gbrain/` · repo indexed as `contenthack` · see `AGENTS.md`
+
+## When to use gstack (Cursor agent)
+
+Load gstack skills for code, infra, and product work — not for generating campaign copy.
+
+| Task | gstack skill | Why |
+|------|-------------|-----|
+| New feature / rethink scope | `/office-hours` then `/autoplan` | CEO + eng + design review before code |
+| Architecture / API design | `/plan-eng-review` | Locks data flow, edge cases, tests |
+| Code review before merge | `/review` | Production bug patterns, auto-fix trivial issues |
+| Security audit | `/cso` | OWASP + STRIDE on auth, MCP, API routes |
+| Test staging / dashboard | `/qa` + `/browse` | Real browser verification — use `/browse`, not generic browser MCP |
+| Ship PR | `/ship` | Tests, coverage, PR creation |
+| Deploy verify | `/land-and-deploy` then `/canary` | Post-deploy health checks |
+| Debug production issue | `/investigate` | Root-cause before fixes |
+| Second opinion (cross-model) | `/codex` | Independent review from another model |
+| Cross-agent browser pairing | `/pair-agent` | Bridge Cursor with remote agents |
+
+## When to use ContentOps agents (app logic)
+
+Use `lib/agents/` orchestrator and `lib/models/routing.ts` for campaign workflow:
+
+`research → strategy → content → video → safety → scheduler → publisher → leadfinder → outreach → analytics`
+
+Model routing (GPT-4o, o4-mini, Kimi K2.5) lives in `lib/models/routing.ts` — do not duplicate in prompts.
+
+## Two-layer architecture
+
+```
+┌─────────────────────────────────────────────────────────┐
+│  gstack (engineering layer)                              │
+│  plan → build → review → qa → ship → deploy → canary    │
+└─────────────────────────────────────────────────────────┘
+                          builds/maintains
+┌─────────────────────────────────────────────────────────┐
+│  ContentOps (product layer)                              │
+│  11 specialized agents + model routing + MCP bridge      │
+└─────────────────────────────────────────────────────────┘
+```
+
+## Competitive advantage
+
+- **gstack**: repeatable engineering process (23 specialist skills) — fewer production bugs, faster ship cycles, cross-model review via `/codex`.
+- **ContentOps**: domain-specific agent orchestration with cost-aware model routing — cheap models for drafts, quality models for research/safety/outreach.
+- **Together**: ship marketing AI product faster *and* with production-grade code quality.
+
+## Defaults
+
+- Web browsing for QA/staging: gstack `/browse` (`~/.cursor/skills/gstack/browse/dist/browse`)
+- MCP bridge: `.trae/mcp.json` → `scripts/trae-contentops-mcp.mjs`
+- Demo mode: `NEXT_PUBLIC_DEMO_MODE=true` — use for local QA without API keys

@@ -11,6 +11,7 @@ import {
   LayoutDashboard,
   Megaphone,
   MessageSquare,
+  Mic,
   Plug,
   Search,
   Send,
@@ -46,6 +47,7 @@ export const dashboardNavGroups: NavGroup[] = [
   {
     label: 'AI Engine',
     items: [
+      { label: 'Voice Manager', href: '/dashboard/voice', icon: Mic, description: 'Speak commands — execute agents & get spoken briefings', keywords: ['voice', 'speak', 'elevenlabs', 'manager', 'g-brain'] },
       { label: 'AI Agent Chat', href: '/dashboard/chat', icon: MessageSquare, description: 'Control agents with natural language', keywords: ['chat', 'prompt', 'assistant'] },
       { label: 'Agent Command Center', href: '/dashboard/agents', icon: Bot, description: 'Run and monitor all agents', keywords: ['agents', 'workflow', 'automation'] },
       { label: 'Model Hub', href: '/dashboard/models', icon: Cpu, description: 'AI model routing & settings', keywords: ['models', 'gpt', 'openai'] },
