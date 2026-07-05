@@ -95,7 +95,7 @@ function EmailActions({ msg }: { msg: OutreachMessage }) {
       </div>
       {providerEnabled === false && (
         <p className="text-[10px] text-muted-foreground">
-          Add RESEND_API_KEY to .env.local for one-click delivery — copy and mail-app options work without it.
+          Add SMTP_HOST, SMTP_USER, and SMTP_PASS to .env.local for one-click delivery — copy and mail-app options work without it.
         </p>
       )}
     </div>

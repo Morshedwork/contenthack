@@ -34,8 +34,10 @@ GBrain stores decisions, code index, and session context so agents work without 
 
 **Status (this machine):**
 - Engine: PGLite local (`~/.gbrain/brain.pglite`)
-- Repo source: `contenthack` (262 files indexed)
-- MCP: registered in Cursor (`gbrain serve`)
+- Repo source: `contenthack` (pinned via `.gbrain-source`)
+- CLI wrapper: `scripts/gbrain.cmd` (Windows — bun + gbrain on PATH)
+- Sync script: `scripts/sync-gbrain.ps1` or `Load gstack. Run /sync-gbrain`
+- MCP: registered in Cursor (`.cursor/mcp.json` → `scripts/gbrain-mcp.cmd`)
 
 **Before coding:** prefer `gbrain search` / `code-def` / `code-refs` over blind grep when the question is semantic.
 

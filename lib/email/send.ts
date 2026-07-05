@@ -1,27 +1,67 @@
 import 'server-only'
 
-/**
- * Email delivery for manager-drafted outreach.
- *
- * - RESEND_API_KEY → enables real sending via Resend's REST API
- * - EMAIL_FROM     → verified sender (defaults to Resend's onboarding sender for testing)
- *
- * Without a key the UI falls back to copy-to-clipboard and mailto links,
- * so outreach always has a path out the door.
- */
-const RESEND_BASE = 'https://api.resend.com'
-const DEFAULT_FROM = 'ContentOps AI <onboarding@resend.dev>'
+import nodemailer from 'nodemailer'
+import type { Transporter } from 'nodemailer'
 
-function getApiKey(): string | undefined {
-  return process.env.RESEND_API_KEY?.trim()
+/**
+ * Email delivery for manager-drafted outreach via Nodemailer + SMTP.
+ *
+ * Required in `.env.local`:
+ *   SMTP_HOST, SMTP_USER, SMTP_PASS
+ *
+ * Optional:
+ *   SMTP_PORT      (default 587)
+ *   SMTP_SECURE    (true for port 465)
+ *   EMAIL_FROM     (default: SMTP_USER)
+ *   EMAIL_REPLY_TO
+ *
+ * Without SMTP config the UI falls back to copy-to-clipboard and mailto links.
+ */
+
+const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
+
+let transporter: Transporter | null = null
+
+function smtpHost(): string | undefined {
+  const host = process.env.SMTP_HOST?.trim()
+  if (!host) return undefined
+  // If someone pastes an @gmail.com address as host, use Google's SMTP server.
+  if (host.includes('@')) return 'smtp.gmail.com'
+  return host
+}
+
+function smtpUser(): string | undefined {
+  return process.env.SMTP_USER?.trim()
+}
+
+function smtpPass(): string | undefined {
+  const pass = process.env.SMTP_PASS?.trim()
+  // Gmail app passwords are often pasted with spaces — strip them for auth.
+  return pass?.replace(/\s+/g, '')
+}
+
+function smtpPort(): number {
+  const raw = process.env.SMTP_PORT?.trim()
+  const n = raw ? Number(raw) : 587
+  return Number.isFinite(n) ? n : 587
+}
+
+function smtpSecure(): boolean {
+  if (process.env.SMTP_SECURE?.trim().toLowerCase() === 'true') return true
+  return smtpPort() === 465
 }
 
 export function hasEmailProvider(): boolean {
-  return Boolean(getApiKey())
+  return Boolean(smtpHost() && smtpUser() && smtpPass())
 }
 
 export function emailFrom(): string {
-  return process.env.EMAIL_FROM?.trim() || DEFAULT_FROM
+  return (
+    process.env.SMTP_FROM?.trim() ||
+    process.env.EMAIL_FROM?.trim() ||
+    smtpUser() ||
+    'ContentOps AI <noreply@localhost>'
+  )
 }
 
 export interface SendEmailInput {
@@ -36,43 +76,49 @@ export interface SendEmailResult {
   to: string
 }
 
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
 export function isValidEmail(value: string): boolean {
   return EMAIL_RE.test(value.trim())
 }
 
-/** Send a plain-text email via Resend. Throws with a readable message on failure. */
-export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
-  const apiKey = getApiKey()
-  if (!apiKey) {
-    throw new Error('RESEND_API_KEY is not configured — add it to .env.local to send emails')
+function getTransporter(): Transporter {
+  if (transporter) return transporter
+
+  const host = smtpHost()
+  const user = smtpUser()
+  const pass = smtpPass()
+  if (!host || !user || !pass) {
+    throw new Error(
+      'SMTP is not configured — set SMTP_HOST, SMTP_USER, and SMTP_PASS in .env.local',
+    )
   }
 
+  transporter = nodemailer.createTransport({
+    host,
+    port: smtpPort(),
+    secure: smtpSecure(),
+    auth: { user, pass },
+  })
+
+  return transporter
+}
+
+/** Send a plain-text email via Nodemailer. Throws with a readable message on failure. */
+export async function sendEmail(input: SendEmailInput): Promise<SendEmailResult> {
   const to = input.to.trim()
   if (!isValidEmail(to)) throw new Error('A valid recipient email address is required')
   if (!input.subject.trim()) throw new Error('Email subject is required')
   if (!input.body.trim()) throw new Error('Email body is required')
 
-  const res = await fetch(`${RESEND_BASE}/emails`, {
-    method: 'POST',
-    headers: {
-      authorization: `Bearer ${apiKey}`,
-      'content-type': 'application/json',
-    },
-    body: JSON.stringify({
-      from: emailFrom(),
-      to: [to],
-      subject: input.subject.trim(),
-      text: input.body.trim(),
-      ...(input.replyTo?.trim() ? { reply_to: input.replyTo.trim() } : {}),
-    }),
+  const transport = getTransporter()
+  const replyTo = input.replyTo?.trim() || process.env.EMAIL_REPLY_TO?.trim()
+
+  const info = await transport.sendMail({
+    from: emailFrom(),
+    to,
+    subject: input.subject.trim(),
+    text: input.body.trim(),
+    ...(replyTo ? { replyTo } : {}),
   })
 
-  const data = (await res.json().catch(() => ({}))) as { id?: string; message?: string; name?: string }
-  if (!res.ok) {
-    throw new Error(data.message || `Email send failed (${res.status})`)
-  }
-
-  return { id: data.id ?? `email-${Date.now()}`, to }
+  return { id: info.messageId || `email-${Date.now()}`, to }
 }

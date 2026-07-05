@@ -16,7 +16,7 @@ export async function POST(request: Request) {
   if (!isValidEmail(to)) return apiError('A valid recipient email is required', 400)
   if (!subject || !text) return apiError('subject and body are required', 400)
   if (!hasEmailProvider()) {
-    return apiError('RESEND_API_KEY is not configured — add it to .env.local, or use Copy / Open in mail app', 400)
+    return apiError('SMTP is not configured — set SMTP_HOST, SMTP_USER, and SMTP_PASS in .env.local, or use Copy / Open in mail app', 400)
   }
 
   try {
