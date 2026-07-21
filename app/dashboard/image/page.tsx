@@ -42,8 +42,8 @@ import { toast } from 'sonner'
 export default function ImageStudioPage() {
   const { data, refresh } = useWorkspace()
   const [prompt, setPrompt] = useState('')
-  const [promptModel, setPromptModel] = useState<ImagePromptModelId>('gpt-4o')
-  const [renderModel, setRenderModel] = useState<ImageRenderModelId>('gpt-image-1.5')
+  const [promptModel, setPromptModel] = useState<ImagePromptModelId>('kimi-k2.5')
+  const [renderModel, setRenderModel] = useState<ImageRenderModelId>('flux')
   const [openaiQuality, setOpenaiQuality] = useState<'standard' | 'hd'>('standard')
   const [gptImageQuality, setGptImageQuality] = useState<GptImageQualityId>('medium')
   const [gptImage2Resolution, setGptImage2Resolution] = useState<GptImage2ResolutionId>('2k')
@@ -64,7 +64,7 @@ export default function ImageStudioPage() {
   const [images, setImages] = useState<GeneratedImage[]>([])
   const [loading, setLoading] = useState(false)
   const [latest, setLatest] = useState<GeneratedImage | null>(null)
-  const [hasOpenAI, setHasOpenAI] = useState(true)
+  const [hasOpenAI, setHasOpenAI] = useState(false)
   const [hasOpenRouter, setHasOpenRouter] = useState(false)
 
   useEffect(() => {
@@ -80,6 +80,18 @@ export default function ImageStudioPage() {
         setHasOpenRouter(Boolean(json.data.openrouter))
         if (json.data.defaultRenderModel) setRenderModel(json.data.defaultRenderModel)
         if (json.data.defaultPromptModel) setPromptModel(json.data.defaultPromptModel)
+        if (!json.data.openai) {
+          setPromptModel((current) =>
+            IMAGE_PROMPT_MODELS.find((m) => m.id === current)?.provider === 'openai'
+              ? (json.data.defaultPromptModel as ImagePromptModelId)
+              : current,
+          )
+          setRenderModel((current) =>
+            getImageRenderProvider(current) === 'openai'
+              ? (json.data.defaultRenderModel as ImageRenderModelId)
+              : current,
+          )
+        }
       })
       .catch(() => {})
   }, [])
@@ -163,6 +175,9 @@ export default function ImageStudioPage() {
             <Sparkles className="size-4 text-violet-400" />
             Generate marketing image
           </CardTitle>
+          <p className="text-xs text-muted-foreground font-normal">
+            Free = Pollinations. OpenRouter Budget = cheapest paid (no true $0 image models on OpenRouter).
+          </p>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
           <div className="flex flex-col gap-1.5">
@@ -181,14 +196,16 @@ export default function ImageStudioPage() {
               <Select value={promptModel} onValueChange={(v) => setPromptModel(v as ImagePromptModelId)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
-                  <SelectGroup>
-                    <SelectLabel>OpenAI</SelectLabel>
-                    {IMAGE_PROMPT_MODELS.filter((m) => m.provider === 'openai').map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
+                  {hasOpenAI && (
+                    <SelectGroup>
+                      <SelectLabel>OpenAI</SelectLabel>
+                      {IMAGE_PROMPT_MODELS.filter((m) => m.provider === 'openai').map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  )}
                   <SelectGroup>
                     <SelectLabel>Moonshot (Kimi)</SelectLabel>
                     {IMAGE_PROMPT_MODELS.filter((m) => m.provider === 'kimi').map((m) => (
@@ -205,25 +222,43 @@ export default function ImageStudioPage() {
               <Select value={renderModel} onValueChange={(v) => setRenderModel(v as ImageRenderModelId)}>
                 <SelectTrigger><SelectValue /></SelectTrigger>
                 <SelectContent>
+                  {hasOpenAI && (
+                    <SelectGroup>
+                      <SelectLabel>OpenAI</SelectLabel>
+                      {OPENAI_RENDER_MODELS.map((m) => (
+                        <SelectItem key={m.id} value={m.id}>
+                          {m.label}
+                        </SelectItem>
+                      ))}
+                    </SelectGroup>
+                  )}
                   <SelectGroup>
-                    <SelectLabel>OpenAI</SelectLabel>
-                    {OPENAI_RENDER_MODELS.map((m) => (
-                      <SelectItem key={m.id} value={m.id}>
-                        {m.label}
-                      </SelectItem>
-                    ))}
-                  </SelectGroup>
-                  <SelectGroup>
-                    <SelectLabel>Pollinations</SelectLabel>
+                    <SelectLabel>Free · Pollinations</SelectLabel>
                     {POLLINATIONS_RENDER_MODELS.map((m) => (
                       <SelectItem key={m.id} value={m.id}>
+                        {m.label} (free)
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                  <SelectGroup>
+                    <SelectLabel>OpenRouter · Budget</SelectLabel>
+                    {OPENROUTER_RENDER_MODELS.filter((m) => m.tier === 'budget').map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
                         {m.label}
                       </SelectItem>
                     ))}
                   </SelectGroup>
                   <SelectGroup>
-                    <SelectLabel>OpenRouter</SelectLabel>
-                    {OPENROUTER_RENDER_MODELS.map((m) => (
+                    <SelectLabel>OpenRouter · Standard</SelectLabel>
+                    {OPENROUTER_RENDER_MODELS.filter((m) => m.tier === 'standard').map((m) => (
+                      <SelectItem key={m.id} value={m.id}>
+                        {m.label}
+                      </SelectItem>
+                    ))}
+                  </SelectGroup>
+                  <SelectGroup>
+                    <SelectLabel>OpenRouter · Premium</SelectLabel>
+                    {OPENROUTER_RENDER_MODELS.filter((m) => m.tier === 'premium').map((m) => (
                       <SelectItem key={m.id} value={m.id}>
                         {m.label}
                       </SelectItem>

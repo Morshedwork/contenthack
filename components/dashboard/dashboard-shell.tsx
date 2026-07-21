@@ -61,6 +61,9 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
   const [mobileOpen, setMobileOpen] = useState(false)
   const [chatOpen, setChatOpen] = useState(false)
   const [sidebarOpen, setSidebarOpen] = useState(true)
+  const [headerModel, setHeaderModel] = useState('deepseek/deepseek-v3.2')
+  const [hasOpenAI, setHasOpenAI] = useState(false)
+  const [hasOpenRouter, setHasOpenRouter] = useState(true)
   const { open: cmdOpen, setOpen: setCmdOpen } = useCommandPalette()
   const demo = isDemoMode()
   const displayName = user.user_metadata?.full_name || user.email || 'Demo User'
@@ -87,6 +90,22 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
   useEffect(() => {
     const stored = localStorage.getItem(SIDEBAR_STORAGE_KEY)
     if (stored !== null) setSidebarOpen(stored === 'true')
+  }, [])
+
+  useEffect(() => {
+    void fetch('/api/providers/status')
+      .then((r) => r.json())
+      .then((json) => {
+        if (!json.success) return
+        const openai = Boolean(json.data.providers?.openai)
+        const openrouter = Boolean(json.data.providers?.openrouter)
+        setHasOpenAI(openai)
+        setHasOpenRouter(openrouter)
+        setHeaderModel(
+          openai ? 'gpt-4o' : openrouter ? 'deepseek/deepseek-v3.2' : 'kimi-k2.5',
+        )
+      })
+      .catch(() => {})
   }, [])
 
   const toggleSidebar = useCallback(() => {
@@ -303,18 +322,41 @@ export function DashboardShell({ user, children }: DashboardShellProps) {
             <Search />
           </Button>
 
-          <Select defaultValue="gpt-4o">
-            <SelectTrigger className="w-[150px] h-11 text-sm hidden md:flex bg-secondary/30 border-border/60 rounded-xl">
+          <Select value={headerModel} onValueChange={setHeaderModel}>
+            <SelectTrigger className="w-[200px] h-11 text-sm hidden md:flex bg-secondary/30 border-border/60 rounded-xl">
               <div className="flex items-center gap-2">
                 <Cpu className="size-4 text-violet-300" />
                 <SelectValue />
               </div>
             </SelectTrigger>
             <SelectContent>
-              <SelectItem value="gpt-4o">GPT-4o</SelectItem>
-              <SelectItem value="gpt-4.1">GPT-4.1</SelectItem>
-              <SelectItem value="gpt-4o-mini">GPT-4o mini</SelectItem>
-              <SelectItem value="o4-mini">o4-mini</SelectItem>
+              {hasOpenAI && (
+                <>
+                  <SelectItem value="gpt-4o">GPT-4o</SelectItem>
+                  <SelectItem value="gpt-4.1">GPT-4.1</SelectItem>
+                  <SelectItem value="gpt-4o-mini">GPT-4o mini</SelectItem>
+                  <SelectItem value="o4-mini">o4-mini</SelectItem>
+                </>
+              )}
+              {hasOpenRouter && (
+                <>
+                  <SelectItem value="deepseek/deepseek-v3.2">DeepSeek V3.2</SelectItem>
+                  <SelectItem value="meta-llama/llama-4-maverick">Llama 4 Maverick</SelectItem>
+                  <SelectItem value="meta-llama/llama-4-scout">Llama 4 Scout</SelectItem>
+                  <SelectItem value="meta-llama/llama-3.3-70b-instruct">Llama 3.3 70B</SelectItem>
+                  <SelectItem value="qwen/qwen3-235b-a22b-2507">Qwen3 235B</SelectItem>
+                  <SelectItem value="qwen/qwen3-next-80b-a3b-instruct">Qwen3 Next 80B</SelectItem>
+                  <SelectItem value="mistralai/mistral-small-3.2-24b-instruct">Mistral Small 3.2</SelectItem>
+                  <SelectItem value="google/gemma-3-27b-it">Gemma 3 27B</SelectItem>
+                  <SelectItem value="z-ai/glm-4.7-flash">GLM 4.7 Flash</SelectItem>
+                  <SelectItem value="deepseek/deepseek-r1">DeepSeek R1</SelectItem>
+                  <SelectItem value="nousresearch/hermes-4-70b">Hermes 4 70B</SelectItem>
+                  <SelectItem value="mistralai/mixtral-8x22b-instruct">Mixtral 8x22B</SelectItem>
+                  <SelectItem value="google/gemma-4-31b-it">Gemma 4 31B</SelectItem>
+                  <SelectItem value="mistralai/mistral-nemo">Mistral Nemo</SelectItem>
+                </>
+              )}
+              <SelectItem value="kimi-k2.5">Kimi K2.5</SelectItem>
             </SelectContent>
           </Select>
 

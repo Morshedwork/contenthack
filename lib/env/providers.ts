@@ -69,7 +69,7 @@ export function defaultImageRenderModel(): ImageRenderModelId {
   if (hasOpenRouter()) {
     const env = process.env.OPENROUTER_IMAGE_MODEL?.trim()
     if (env) return env as ImageRenderModelId
-    return 'bytedance-seed/seedream-4.5' as OpenRouterRenderModelId
+    return 'krea/krea-2-medium-turbo' as OpenRouterRenderModelId
   }
   if (hasOpenAIImage()) {
     return normalizeOpenAIImageModel(process.env.OPENAI_IMAGE_MODEL?.trim() || OPENAI_IMAGE_MODEL) as ImageRenderModelId
@@ -88,7 +88,7 @@ export function defaultVideoModel(): PixverseModel {
 export function defaultOpenRouterVideoModel(): OpenRouterVideoModelId {
   const env = process.env.OPENROUTER_VIDEO_MODEL?.trim()
   if (env) return env as OpenRouterVideoModelId
-  return 'openai/sora-2-pro'
+  return 'bytedance/seedance-1-5-pro'
 }
 
 export { defaultOpenRouterVideoResolution, defaultOpenRouterGenerateAudio, videoLayerSummary }

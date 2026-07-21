@@ -9,18 +9,21 @@ import type {
 import { normalizeOpenRouterVideoModel } from '@/lib/models/media-options'
 import type { ModelRouting } from '@/types'
 
-/** Best-first OpenRouter video stack — tried before PixVerse. */
+/** Best-first OpenRouter video stack — budget models first, then premium, then PixVerse. */
 export const DEFAULT_OPENROUTER_VIDEO_CHAIN: OpenRouterVideoModelId[] = [
-  'kwaivgi/kling-v3.0-pro',
-  'openai/sora-2-pro',
-  'google/veo-3.1',
-  'google/veo-3.1-fast',
-  'google/veo-3.1-lite',
-  'bytedance/seedance-2.0',
   'bytedance/seedance-1-5-pro',
-  'alibaba/wan-2.7',
+  'bytedance/seedance-2.0-fast',
   'alibaba/wan-2.6',
+  'google/veo-3.1-lite',
   'kwaivgi/kling-v3.0-std',
+  'x-ai/grok-imagine-video',
+  'minimax/hailuo-2.3',
+  'bytedance/seedance-2.0',
+  'google/veo-3.1-fast',
+  'kwaivgi/kling-v3.0-pro',
+  'alibaba/wan-2.7',
+  'google/veo-3.1',
+  'openai/sora-2-pro',
 ]
 
 /** Best-first PixVerse stack — last resort when OpenRouter fails or is unavailable. */
@@ -55,7 +58,7 @@ export function defaultVideoLayerMode(): VideoProvider {
 export function defaultOpenRouterVideoResolution(): OpenRouterVideoResolutionId {
   const env = process.env.OPENROUTER_VIDEO_RESOLUTION?.trim().toLowerCase()
   if (env === '720p' || env === '1080p') return env
-  return '1080p'
+  return '720p'
 }
 
 export function defaultOpenRouterGenerateAudio(): boolean {

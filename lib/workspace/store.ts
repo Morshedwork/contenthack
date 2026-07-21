@@ -32,7 +32,6 @@ import {
   demoLeads,
   demoMarketResearch,
   demoModelRouting,
-  demoModels,
   demoOutreachMessages,
   demoPublishLogs,
   demoROI,
@@ -40,6 +39,7 @@ import {
   demoVideoScripts,
 } from '@/lib/demo/data'
 import { assignedModelLabel } from '@/lib/models/routing'
+import { getAvailableModels } from '@/lib/models'
 import { isDemoMode } from '@/lib/demo/mode'
 import { buildInvestorPitchWorkspaceSlice } from '@/lib/demo/investor-pitch'
 import type { DemoPresetId } from '@/lib/demo/presets'
@@ -126,7 +126,7 @@ export function createEmptyWorkspace(): WorkspaceState {
     brandProfile: { ...demoBrandProfile, brandName: '', brandDescription: '', productDescription: '', mainOffer: '', themeCollection: [], activeThemeId: undefined },
     safetySettings: { ...demoSafetySettings },
     integrations: demoIntegrations.map((i) => ({ ...i, connected: false, mockMode: false })),
-    models: demoModels.map((m) => ({ ...m })),
+    models: getAvailableModels().map((m) => ({ ...m })),
     modelRouting: demoModelRouting.map((r) => ({ ...r })),
     lastWorkflow: null,
     customPromptDetails: '',
@@ -152,7 +152,7 @@ function cloneDemoDefaults(): WorkspaceState {
     brandProfile: { ...demoBrandProfile },
     safetySettings: { ...demoSafetySettings },
     integrations: demoIntegrations.map((i) => ({ ...i })),
-    models: demoModels.map((m) => ({ ...m })),
+    models: getAvailableModels().map((m) => ({ ...m })),
     modelRouting: demoModelRouting.map((r) => ({ ...r })),
     lastWorkflow: null,
     customPromptDetails: '',

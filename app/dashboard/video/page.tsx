@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select'
+import { Select, SelectContent, SelectGroup, SelectItem, SelectLabel, SelectTrigger, SelectValue } from '@/components/ui/select'
 import { CustomPromptPanel } from '@/components/shared/custom-prompt-panel'
 import { BrandThemeReferenceSelect } from '@/components/brand/brand-theme-reference-select'
 import { FullReelCampaignPipeline } from '@/components/video/video-agent-pipeline'
@@ -56,11 +56,11 @@ export default function VideoStudioPage() {
   const [videoPrompt, setVideoPrompt] = useState('')
   const [videoProvider, setVideoProvider] = useState<VideoProvider>('layered')
   const [videoModel, setVideoModel] = useState<PixverseModel>('v6')
-  const [openRouterVideoModel, setOpenRouterVideoModel] = useState<OpenRouterVideoModelId>('openai/sora-2-pro')
+  const [openRouterVideoModel, setOpenRouterVideoModel] = useState<OpenRouterVideoModelId>('bytedance/seedance-1-5-pro')
   const [videoDuration, setVideoDuration] = useState<VideoDurationSec>(5)
   const [openRouterDuration, setOpenRouterDuration] = useState<OpenRouterVideoDurationSec>(5)
   const [videoQuality, setVideoQuality] = useState<PixverseQuality>('540p')
-  const [openRouterResolution, setOpenRouterResolution] = useState<OpenRouterVideoResolutionId>('1080p')
+  const [openRouterResolution, setOpenRouterResolution] = useState<OpenRouterVideoResolutionId>('720p')
   const [generateAudio, setGenerateAudio] = useState(false)
   const [aspectRatio, setAspectRatio] = useState<(typeof VIDEO_ASPECT_RATIOS)[number]['id']>('9:16')
   const [customPromptDetails, setCustomPromptDetails] = useState('')
@@ -260,7 +260,7 @@ export default function VideoStudioPage() {
         <div>
           <h1 className="text-2xl md:text-3xl font-display tracking-tight mb-1">Video Studio</h1>
           <p className="text-muted-foreground text-sm">
-            Multi-agent reel pipelines · layered OpenRouter video (best first) · PixVerse fallback
+            Multi-agent reel pipelines · OpenRouter budget video first (no $0 OR video models) · PixVerse fallback
           </p>
         </div>
         <div className="flex items-center gap-2 flex-wrap">
@@ -420,9 +420,24 @@ export default function VideoStudioPage() {
                       >
                         <SelectTrigger><SelectValue /></SelectTrigger>
                         <SelectContent>
-                          {OPENROUTER_VIDEO_MODELS.map((m) => (
-                            <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
-                          ))}
+                          <SelectGroup>
+                            <SelectLabel>Budget / low-cost</SelectLabel>
+                            {OPENROUTER_VIDEO_MODELS.filter((m) => m.tier === 'budget').map((m) => (
+                              <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+                            ))}
+                          </SelectGroup>
+                          <SelectGroup>
+                            <SelectLabel>Standard</SelectLabel>
+                            {OPENROUTER_VIDEO_MODELS.filter((m) => m.tier === 'standard').map((m) => (
+                              <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+                            ))}
+                          </SelectGroup>
+                          <SelectGroup>
+                            <SelectLabel>Premium</SelectLabel>
+                            {OPENROUTER_VIDEO_MODELS.filter((m) => m.tier === 'premium').map((m) => (
+                              <SelectItem key={m.id} value={m.id}>{m.label}</SelectItem>
+                            ))}
+                          </SelectGroup>
                         </SelectContent>
                       </Select>
                     </div>

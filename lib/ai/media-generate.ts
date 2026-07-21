@@ -25,9 +25,11 @@ import {
   type GptImage2ThinkingId,
   type OpenRouterImageQualityId,
   type OpenRouterImageResolutionId,
+  type OpenRouterRenderModelId,
   type OpenRouterVideoModelId,
   type OpenRouterVideoResolutionId,
   type VideoProvider,
+  buildOpenRouterImageChain,
 } from '@/lib/models/media-options'
 import { enhanceImagePrompt, hasKimi, renderImageFromPrompt } from './kimi'
 import {
@@ -148,8 +150,9 @@ export async function generateMarketingImage(input: {
   research?: MarketResearch | null
   signals?: CrustdataTaskInput
 }): Promise<GeneratedImage> {
-  const renderModelId = resolveRenderModelId(input.renderModel)
-  const renderProvider = getImageRenderProvider(renderModelId) || 'pollinations'
+  const preferredRenderModelId = resolveRenderModelId(input.renderModel)
+  let usedRenderModelId: ImageRenderModelId | string = preferredRenderModelId
+  const renderProvider = getImageRenderProvider(preferredRenderModelId) || 'pollinations'
 
   const theme = resolveBrandTheme(input.brandProfile, input.brandThemeId)
   const brandContext = buildBrandContext(input.brandProfile, theme)
@@ -169,12 +172,27 @@ export async function generateMarketingImage(input: {
   let provider = ''
 
   const renderErrors: string[] = []
+  const preferFreePollinations = isPollinationsRenderModel(preferredRenderModelId)
 
-  if (isOpenAIRenderModel(renderModelId) && hasOpenAIImage()) {
+  // True free path first when user picked Pollinations
+  if (preferFreePollinations) {
+    try {
+      imageUrl = await renderImageFromPrompt(brief.enhancedPrompt, aspectRatio, {
+        renderModel: toPollinationsModel(preferredRenderModelId),
+        negativePrompt: brief.negativePrompt,
+      })
+      provider = 'Pollinations'
+      usedRenderModelId = preferredRenderModelId
+    } catch (err) {
+      renderErrors.push(`Pollinations: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  if (!imageUrl && isOpenAIRenderModel(preferredRenderModelId) && hasOpenAIImage()) {
     try {
       imageUrl = await renderImageWithOpenAI(
         brief.enhancedPrompt,
-        toOpenAIImageModel(renderModelId),
+        toOpenAIImageModel(preferredRenderModelId),
         aspectRatio,
         {
           quality: input.openaiQuality,
@@ -184,53 +202,73 @@ export async function generateMarketingImage(input: {
         },
       )
       provider = 'OpenAI'
+      usedRenderModelId = preferredRenderModelId
     } catch (err) {
       renderErrors.push(`OpenAI: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
-  if (!imageUrl && isOpenRouterRenderModel(renderModelId) && hasOpenRouter()) {
+  if (!imageUrl && isOpenRouterRenderModel(preferredRenderModelId) && hasOpenRouter()) {
     try {
       imageUrl = await renderImageWithOpenRouter({
         prompt: brief.enhancedPrompt,
-        model: toOpenRouterImageModel(renderModelId),
+        model: toOpenRouterImageModel(preferredRenderModelId),
         aspectRatio,
         resolution: input.openrouterResolution,
         quality: input.openrouterQuality,
       })
       provider = 'OpenRouter'
+      usedRenderModelId = preferredRenderModelId
     } catch (err) {
-      renderErrors.push(`OpenRouter: ${err instanceof Error ? err.message : String(err)}`)
+      renderErrors.push(`OpenRouter(${preferredRenderModelId}): ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
-  if (!imageUrl && isPollinationsRenderModel(renderModelId)) {
-    try {
-      imageUrl = await renderImageFromPrompt(brief.enhancedPrompt, aspectRatio, {
-        renderModel: toPollinationsModel(renderModelId),
-        negativePrompt: brief.negativePrompt,
-      })
-      provider = 'Pollinations'
-    } catch (err) {
-      renderErrors.push(`Pollinations: ${err instanceof Error ? err.message : String(err)}`)
+  // Budget-first OpenRouter fallbacks (skip when user explicitly chose free Pollinations)
+  if (!imageUrl && hasOpenRouter() && !preferFreePollinations) {
+    const alreadyTriedPreferred =
+      isOpenRouterRenderModel(preferredRenderModelId) &&
+      renderErrors.some((e) => e.startsWith(`OpenRouter(${preferredRenderModelId})`))
+    for (const fallbackModel of buildOpenRouterImageChain(preferredRenderModelId)) {
+      if (alreadyTriedPreferred && fallbackModel === preferredRenderModelId) continue
+      try {
+        imageUrl = await renderImageWithOpenRouter({
+          prompt: brief.enhancedPrompt,
+          model: fallbackModel as OpenRouterRenderModelId,
+          aspectRatio,
+          resolution: input.openrouterResolution,
+          quality: input.openrouterQuality,
+        })
+        provider = fallbackModel === preferredRenderModelId
+          ? 'OpenRouter'
+          : `OpenRouter (${fallbackModel} fallback)`
+        usedRenderModelId = fallbackModel
+        if (fallbackModel !== preferredRenderModelId) {
+          console.info(`[image-layer] fallback succeeded on ${fallbackModel}`)
+        }
+        break
+      } catch (err) {
+        renderErrors.push(`OpenRouter(${fallbackModel}): ${err instanceof Error ? err.message : String(err)}`)
+      }
     }
   }
 
-  // Layer fallback: OpenAI render failed → try Pollinations
-  if (!imageUrl && isOpenAIRenderModel(renderModelId)) {
+  // Final free fallback — Pollinations Flux
+  if (!imageUrl) {
     try {
       imageUrl = await renderImageFromPrompt(brief.enhancedPrompt, aspectRatio, {
         renderModel: 'flux',
         negativePrompt: brief.negativePrompt,
       })
       provider = 'Pollinations (fallback)'
+      usedRenderModelId = 'flux'
     } catch (err) {
       renderErrors.push(`Pollinations fallback: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
 
   if (!imageUrl) {
-    if (renderProvider === 'openai' && !hasOpenAIImage() && !isPollinationsRenderModel(renderModelId)) {
+    if (renderProvider === 'openai' && !hasOpenAIImage() && !isPollinationsRenderModel(preferredRenderModelId)) {
       throw new Error('OPENAI_API_KEY is required for OpenAI image models. Add it to your .env.local file.')
     }
     if (renderProvider === 'openrouter' && !hasOpenRouter()) {
@@ -239,11 +277,11 @@ export async function generateMarketingImage(input: {
     throw new Error(
       renderErrors.length
         ? `Image render failed — ${renderErrors.join('; ')}`
-        : `Unknown or unavailable image render model: ${renderModelId}`,
+        : `Unknown or unavailable image render model: ${preferredRenderModelId}`,
     )
   }
 
-  const modelLabel = `${renderModelId} · ${promptModelLabel}`
+  const modelLabel = `${usedRenderModelId} · ${promptModelLabel}`
 
   return {
     id: id('img'),

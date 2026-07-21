@@ -26,6 +26,8 @@ import { hasElevenLabs } from '@/lib/ai/elevenlabs'
 import { hasKimi, KIMI_MODEL } from '@/lib/ai/kimi'
 import { generateJSON, hasTextAI } from '@/lib/ai/layer'
 import { hasOpenAI, OPENAI_MODEL, OPENAI_MODEL_QUALITY } from '@/lib/ai/openai'
+import { hasOpenRouter } from '@/lib/ai/openrouter'
+import { DEFAULT_OPENROUTER_TEXT_MODEL } from '@/lib/models/openrouter-text'
 import { MODEL_TASK, resolveTaskModel } from '@/lib/models/routing'
 import { voiceLanguageInstruction } from '@/lib/voice/languages'
 import { resolveWorkspaceContext } from '@/lib/workspace/context'
@@ -34,6 +36,13 @@ import { computeDynamicROI, getWorkspace, type WorkspaceState } from '@/lib/work
 function buildStack(crustdataUsed: boolean): ManagerStack {
   const gStack: string[] = []
   if (hasOpenAI()) gStack.push(OPENAI_MODEL_QUALITY, OPENAI_MODEL)
+  if (hasOpenRouter()) {
+    gStack.push(
+      process.env.OPENROUTER_TEXT_MODEL?.trim() || DEFAULT_OPENROUTER_TEXT_MODEL,
+      'meta-llama/llama-4-maverick',
+      'qwen/qwen3-next-80b-a3b-instruct',
+    )
+  }
   if (hasKimi()) gStack.push(KIMI_MODEL)
   return {
     gBrain: hasTextAI(),
