@@ -78,6 +78,21 @@ export const demoModels: AIModel[] = [
   { id: 'gpt-4.1-mini', name: 'GPT-4.1 mini', provider: 'OpenAI', bestFor: 'Balanced speed & quality', speed: 'fast', costLevel: 'low', qualityScore: 89, contextSize: '1M', status: 'available', useCases: ['Video scripts', 'Analytics summary'] },
   { id: 'o4-mini', name: 'o4-mini', provider: 'OpenAI', bestFor: 'Reasoning, safety & scoring', speed: 'medium', costLevel: 'medium', qualityScore: 91, contextSize: '200K', status: 'available', useCases: ['Brand safety', 'Lead scoring'] },
   { id: 'kimi-k2.5', name: 'Kimi K2.5', provider: 'Moonshot AI', bestFor: 'AI image prompt enhancement', speed: 'medium', costLevel: 'medium', qualityScore: 90, contextSize: '256K', status: 'available', useCases: ['Image prompts', 'Visual briefs', 'Social creatives'] },
+  // OpenRouter open-source text models
+  { id: 'meta-llama/llama-4-maverick', name: 'Llama 4 Maverick', provider: 'OpenRouter', bestFor: 'Content generation, research, long context', speed: 'medium', costLevel: 'medium', qualityScore: 93, contextSize: '1M', status: 'available', useCases: ['Market research', 'Content generation', 'Outreach writing'], isDefault: false },
+  { id: 'meta-llama/llama-4-scout', name: 'Llama 4 Scout', provider: 'OpenRouter', bestFor: 'Fast drafts & bulk generation', speed: 'fast', costLevel: 'low', qualityScore: 88, contextSize: '1M', status: 'available', useCases: ['Content generation', 'Analytics summary', 'Scheduling'] },
+  { id: 'meta-llama/llama-3.3-70b-instruct', name: 'Llama 3.3 70B', provider: 'OpenRouter', bestFor: 'Reliable open-source writing', speed: 'medium', costLevel: 'low', qualityScore: 90, contextSize: '128K', status: 'available', useCases: ['Content generation', 'Video scripts', 'Outreach writing'] },
+  { id: 'deepseek/deepseek-v3.2', name: 'DeepSeek V3.2', provider: 'OpenRouter', bestFor: 'Research, strategy, complex analysis', speed: 'medium', costLevel: 'low', qualityScore: 94, contextSize: '164K', status: 'available', useCases: ['Market research', 'Brand safety', 'Lead scoring'] },
+  { id: 'deepseek/deepseek-r1', name: 'DeepSeek R1', provider: 'OpenRouter', bestFor: 'Deep reasoning & safety checks', speed: 'slow', costLevel: 'medium', qualityScore: 95, contextSize: '164K', status: 'available', useCases: ['Brand safety', 'Lead scoring', 'Market research'] },
+  { id: 'qwen/qwen3-235b-a22b-2507', name: 'Qwen3 235B', provider: 'OpenRouter', bestFor: 'High-quality multilingual content', speed: 'medium', costLevel: 'low', qualityScore: 93, contextSize: '262K', status: 'available', useCases: ['Content generation', 'Outreach writing', 'Market research'] },
+  { id: 'qwen/qwen3-next-80b-a3b-instruct', name: 'Qwen3 Next 80B', provider: 'OpenRouter', bestFor: 'Fast quality at low cost', speed: 'fast', costLevel: 'low', qualityScore: 90, contextSize: '262K', status: 'available', useCases: ['Content generation', 'Video scripts', 'Analytics summary'] },
+  { id: 'mistralai/mistral-small-3.2-24b-instruct', name: 'Mistral Small 3.2', provider: 'OpenRouter', bestFor: 'Fast low-cost bulk tasks', speed: 'fast', costLevel: 'low', qualityScore: 87, contextSize: '128K', status: 'available', useCases: ['Content generation', 'Analytics summary', 'Scheduling'] },
+  { id: 'mistralai/mistral-nemo', name: 'Mistral Nemo', provider: 'OpenRouter', bestFor: 'Lightweight open generation', speed: 'fast', costLevel: 'low', qualityScore: 84, contextSize: '128K', status: 'available', useCases: ['Content generation', 'Bulk generation'] },
+  { id: 'google/gemma-3-27b-it', name: 'Gemma 3 27B', provider: 'OpenRouter', bestFor: 'Open Google-quality drafting', speed: 'fast', costLevel: 'low', qualityScore: 86, contextSize: '128K', status: 'available', useCases: ['Content generation', 'Video scripts'] },
+  { id: 'z-ai/glm-4.7-flash', name: 'GLM 4.7 Flash', provider: 'OpenRouter', bestFor: 'Speed-first open generation', speed: 'fast', costLevel: 'low', qualityScore: 88, contextSize: '200K', status: 'available', useCases: ['Content generation', 'Analytics summary', 'Lead scoring'] },
+  { id: 'nousresearch/hermes-4-70b', name: 'Hermes 4 70B', provider: 'OpenRouter', bestFor: 'Agent workflows & tool-style writing', speed: 'medium', costLevel: 'low', qualityScore: 89, contextSize: '128K', status: 'available', useCases: ['Outreach writing', 'Content generation', 'Strategy'] },
+  { id: 'mistralai/mixtral-8x22b-instruct', name: 'Mixtral 8x22B', provider: 'OpenRouter', bestFor: 'Open MoE writing & analysis', speed: 'medium', costLevel: 'low', qualityScore: 88, contextSize: '64K', status: 'available', useCases: ['Market research', 'Content generation', 'Analytics summary'] },
+  { id: 'google/gemma-4-31b-it', name: 'Gemma 4 31B', provider: 'OpenRouter', bestFor: 'Strong open drafting', speed: 'fast', costLevel: 'low', qualityScore: 89, contextSize: '262K', status: 'available', useCases: ['Content generation', 'Video scripts', 'Outreach writing'] },
   { id: 'gpt-image-1.5', name: 'GPT Image 1.5', provider: 'OpenAI', bestFor: 'Best OpenAI image generation via API', speed: 'medium', costLevel: 'medium', qualityScore: 96, contextSize: 'N/A', status: 'available', useCases: ['Image generation', 'Brand creatives', 'Marketing visuals'] },
   { id: 'gpt-image-2', name: 'GPT Image 2.0', provider: 'OpenAI', bestFor: 'Latest flagship — 2K/4K, reasoning mode', speed: 'medium', costLevel: 'high', qualityScore: 98, contextSize: 'N/A', status: 'available', useCases: ['Image generation', 'High-res assets', 'Product shots', 'Complex compositions'] },
   { id: 'gpt-image-1', name: 'GPT Image 1', provider: 'OpenAI', bestFor: 'Reliable OpenAI image generation', speed: 'medium', costLevel: 'medium', qualityScore: 93, contextSize: 'N/A', status: 'available', useCases: ['Image generation', 'Social creatives'] },
@@ -87,15 +102,15 @@ export const demoModels: AIModel[] = [
 ]
 
 export const demoModelRouting: ModelRouting[] = [
-  { taskType: 'Market research', assignedModel: 'GPT-4o', fallbackModel: 'GPT-4.1', temperature: 0.3, maxTokens: 4096, costEstimate: '$0.08/task', qualityPriority: 'quality' },
-  { taskType: 'Content generation', assignedModel: 'GPT-4o', fallbackModel: 'GPT-4o mini', temperature: 0.7, maxTokens: 2048, costEstimate: '$0.05/post', qualityPriority: 'balanced' },
-  { taskType: 'Video scripts', assignedModel: 'GPT-4.1 mini', fallbackModel: 'GPT-4o', temperature: 0.8, maxTokens: 3072, costEstimate: '$0.04/script', qualityPriority: 'balanced' },
-  { taskType: 'Brand safety', assignedModel: 'o4-mini', fallbackModel: 'GPT-4o', temperature: 0.1, maxTokens: 1024, costEstimate: '$0.03/check', qualityPriority: 'quality' },
-  { taskType: 'Lead scoring', assignedModel: 'o4-mini', fallbackModel: 'GPT-4o mini', temperature: 0.2, maxTokens: 4096, costEstimate: '$0.02/lead', qualityPriority: 'speed' },
-  { taskType: 'Outreach writing', assignedModel: 'GPT-4o', fallbackModel: 'GPT-4.1', temperature: 0.6, maxTokens: 1536, costEstimate: '$0.04/message', qualityPriority: 'quality' },
-  { taskType: 'Analytics summary', assignedModel: 'GPT-4o mini', fallbackModel: 'GPT-4.1 mini', temperature: 0.3, maxTokens: 2048, costEstimate: '$0.02/report', qualityPriority: 'speed' },
-  { taskType: 'Image generation', assignedModel: 'GPT Image 1.5', fallbackModel: 'GPT Image 1', temperature: 0.7, maxTokens: 1024, costEstimate: '$0.04/image', qualityPriority: 'quality' },
-  { taskType: 'Video generation', assignedModel: 'Sora 2 Pro', fallbackModel: 'Veo 3.1', temperature: 0.8, maxTokens: 512, costEstimate: '$0.25/video', qualityPriority: 'quality' },
+  { taskType: 'Market research', assignedModel: 'DeepSeek V3.2', fallbackModel: 'Llama 4 Maverick', temperature: 0.3, maxTokens: 4096, costEstimate: '$0.02/task', qualityPriority: 'quality' },
+  { taskType: 'Content generation', assignedModel: 'Llama 4 Maverick', fallbackModel: 'Qwen3 Next 80B', temperature: 0.7, maxTokens: 2048, costEstimate: '$0.02/post', qualityPriority: 'balanced' },
+  { taskType: 'Video scripts', assignedModel: 'Qwen3 Next 80B', fallbackModel: 'Llama 3.3 70B', temperature: 0.8, maxTokens: 3072, costEstimate: '$0.01/script', qualityPriority: 'balanced' },
+  { taskType: 'Brand safety', assignedModel: 'DeepSeek R1', fallbackModel: 'DeepSeek V3.2', temperature: 0.1, maxTokens: 1024, costEstimate: '$0.02/check', qualityPriority: 'quality' },
+  { taskType: 'Lead scoring', assignedModel: 'GLM 4.7 Flash', fallbackModel: 'Mistral Small 3.2', temperature: 0.2, maxTokens: 4096, costEstimate: '$0.01/lead', qualityPriority: 'speed' },
+  { taskType: 'Outreach writing', assignedModel: 'Hermes 4 70B', fallbackModel: 'Qwen3 235B', temperature: 0.6, maxTokens: 1536, costEstimate: '$0.02/message', qualityPriority: 'quality' },
+  { taskType: 'Analytics summary', assignedModel: 'Mistral Small 3.2', fallbackModel: 'Llama 4 Scout', temperature: 0.3, maxTokens: 2048, costEstimate: '$0.01/report', qualityPriority: 'speed' },
+  { taskType: 'Image generation', assignedModel: 'Krea 2 Medium Turbo', fallbackModel: 'Nano Banana 2 Lite', temperature: 0.7, maxTokens: 512, costEstimate: 'budget/image', qualityPriority: 'balanced' },
+  { taskType: 'Video generation', assignedModel: 'Seedance 1.5 Pro', fallbackModel: 'Wan 2.6', temperature: 0.8, maxTokens: 512, costEstimate: 'budget/video', qualityPriority: 'balanced' },
 ]
 
 export const demoMarketResearch: MarketResearch = {

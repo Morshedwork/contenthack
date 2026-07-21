@@ -34,38 +34,79 @@ export const OPENAI_RENDER_MODELS = [
   { id: 'dall-e-2', label: 'DALL·E 2', description: 'Fast, economical', provider: 'openai' as const },
 ] as const
 
-/** OpenRouter image models — one API key, 30+ models. IDs match OpenRouter slugs. */
+/**
+ * OpenRouter image models — one API key. IDs match live OpenRouter image API.
+ * Note: OpenRouter has no `:free` dedicated image models; "budget" = lowest paid cost.
+ * True $0 images use Pollinations (POLLINATIONS_RENDER_MODELS).
+ */
 export const OPENROUTER_RENDER_MODELS = [
-  // ByteDance
-  { id: 'bytedance-seed/seedream-4.5', label: 'Seedream 4.5', description: 'ByteDance — high quality text-to-image', provider: 'openrouter' as const },
-  // OpenAI
-  { id: 'openai/gpt-image-2', label: 'GPT Image 2', description: 'OpenAI — latest flagship via OpenRouter', provider: 'openrouter' as const },
-  { id: 'openai/gpt-image-1.5', label: 'GPT Image 1.5', description: 'OpenAI — best detail & edits', provider: 'openrouter' as const },
-  { id: 'openai/gpt-image-1', label: 'GPT Image 1', description: 'OpenAI — brand-safe generation', provider: 'openrouter' as const },
-  { id: 'openai/gpt-image-1-mini', label: 'GPT Image 1 Mini', description: 'OpenAI — fast & cost-efficient', provider: 'openrouter' as const },
-  { id: 'openai/gpt-5-image', label: 'GPT-5 Image', description: 'OpenAI — multimodal GPT-5 + image', provider: 'openrouter' as const },
-  { id: 'openai/gpt-5-image-mini', label: 'GPT-5 Image Mini', description: 'OpenAI — efficient GPT-5 image', provider: 'openrouter' as const },
-  // Black Forest Labs (FLUX)
-  { id: 'black-forest-labs/flux.2-max', label: 'FLUX.2 Max', description: 'Black Forest Labs — top-tier quality', provider: 'openrouter' as const },
-  { id: 'black-forest-labs/flux.2-pro', label: 'FLUX.2 Pro', description: 'Black Forest Labs — cinematic', provider: 'openrouter' as const },
-  { id: 'black-forest-labs/flux.2-flex', label: 'FLUX.2 Flex', description: 'Black Forest Labs — typography & fine detail', provider: 'openrouter' as const },
-  { id: 'black-forest-labs/flux.2-klein-4b', label: 'FLUX.2 Klein 4B', description: 'Black Forest Labs — fastest FLUX', provider: 'openrouter' as const },
-  // Google (Nano Banana)
-  { id: 'google/gemini-3-pro-image', label: 'Nano Banana Pro', description: 'Google Gemini 3 Pro — best image quality', provider: 'openrouter' as const },
-  { id: 'google/gemini-3.1-flash-image', label: 'Nano Banana 2', description: 'Google Gemini 3.1 Flash — Pro quality at speed', provider: 'openrouter' as const },
-  { id: 'google/gemini-3.1-flash-lite-image', label: 'Nano Banana 2 Lite', description: 'Google — fastest Gemini image', provider: 'openrouter' as const },
-  { id: 'google/gemini-2.5-flash-image', label: 'Nano Banana (2.5 Flash)', description: 'Google — contextual image generation', provider: 'openrouter' as const },
-  // xAI, Microsoft, Sourceful, Recraft
-  { id: 'x-ai/grok-imagine-image-quality', label: 'Grok Imagine', description: 'xAI — photorealistic 1K/2K', provider: 'openrouter' as const },
-  { id: 'microsoft/mai-image-2.5', label: 'MAI-Image 2.5', description: 'Microsoft Azure — photorealistic', provider: 'openrouter' as const },
-  { id: 'sourceful/riverflow-v2.5-pro', label: 'Riverflow V2.5 Pro', description: 'Sourceful — top-tier control', provider: 'openrouter' as const },
-  { id: 'sourceful/riverflow-v2.5-fast', label: 'Riverflow V2.5 Fast', description: 'Sourceful — production speed', provider: 'openrouter' as const },
-  { id: 'recraft/recraft-v4.1-utility-pro', label: 'Recraft V4.1 Pro', description: 'Recraft — ~2K general purpose', provider: 'openrouter' as const },
-  { id: 'recraft/recraft-v4.1-pro-vector', label: 'Recraft V4.1 Vector', description: 'Recraft — SVG vector output', provider: 'openrouter' as const },
-  // Legacy / stability
-  { id: 'google/imagen-4', label: 'Imagen 4', description: 'Google — photorealistic', provider: 'openrouter' as const },
-  { id: 'stability-ai/stable-diffusion-3.5-large', label: 'SD 3.5 Large', description: 'Stability — versatile creatives', provider: 'openrouter' as const },
+  // Budget / low-cost
+  { id: 'krea/krea-2-medium-turbo', label: 'Krea 2 Medium Turbo', description: 'Budget — fastest Krea drafts', provider: 'openrouter' as const, tier: 'budget' as const },
+  { id: 'krea/krea-2-medium', label: 'Krea 2 Medium', description: 'Budget — balanced Krea', provider: 'openrouter' as const, tier: 'budget' as const },
+  { id: 'krea/krea-2-large', label: 'Krea 2 Large', description: 'Budget — higher-quality Krea', provider: 'openrouter' as const, tier: 'budget' as const },
+  { id: 'google/gemini-3.1-flash-lite-image', label: 'Nano Banana 2 Lite', description: 'Budget — cheapest Gemini image tokens', provider: 'openrouter' as const, tier: 'budget' as const },
+  { id: 'google/gemini-2.5-flash-image', label: 'Nano Banana (2.5 Flash)', description: 'Budget — fast Gemini image', provider: 'openrouter' as const, tier: 'budget' as const },
+  { id: 'black-forest-labs/flux.2-klein-4b', label: 'FLUX.2 Klein 4B', description: 'Budget — cheapest FLUX', provider: 'openrouter' as const, tier: 'budget' as const },
+  { id: 'sourceful/riverflow-v2.5-fast', label: 'Riverflow V2.5 Fast', description: 'Budget — fast Sourceful', provider: 'openrouter' as const, tier: 'budget' as const },
+  { id: 'sourceful/riverflow-v2-fast', label: 'Riverflow V2 Fast', description: 'Budget — Sourceful V2 fast', provider: 'openrouter' as const, tier: 'budget' as const },
+  { id: 'recraft/recraft-v4.1-utility', label: 'Recraft V4.1 Utility', description: 'Budget — ~1K general purpose', provider: 'openrouter' as const, tier: 'budget' as const },
+  { id: 'recraft/recraft-v3', label: 'Recraft V3', description: 'Budget — classic creatives', provider: 'openrouter' as const, tier: 'budget' as const },
+  { id: 'microsoft/mai-image-2.5', label: 'MAI-Image 2.5', description: 'Budget — Microsoft Azure image', provider: 'openrouter' as const, tier: 'budget' as const },
+  // Standard
+  { id: 'bytedance-seed/seedream-4.5', label: 'Seedream 4.5', description: 'ByteDance — high quality text-to-image', provider: 'openrouter' as const, tier: 'standard' as const },
+  { id: 'google/gemini-3.1-flash-image', label: 'Nano Banana 2', description: 'Gemini 3.1 Flash — Pro quality at speed', provider: 'openrouter' as const, tier: 'standard' as const },
+  { id: 'google/gemini-3.1-flash-image-preview', label: 'Nano Banana 2 Preview', description: 'Gemini 3.1 Flash image preview', provider: 'openrouter' as const, tier: 'standard' as const },
+  { id: 'google/gemini-3-pro-image', label: 'Nano Banana Pro', description: 'Gemini 3 Pro — best Gemini image', provider: 'openrouter' as const, tier: 'standard' as const },
+  { id: 'black-forest-labs/flux.2-pro', label: 'FLUX.2 Pro', description: 'Black Forest Labs — cinematic', provider: 'openrouter' as const, tier: 'standard' as const },
+  { id: 'black-forest-labs/flux.2-flex', label: 'FLUX.2 Flex', description: 'Black Forest Labs — typography & fine detail', provider: 'openrouter' as const, tier: 'standard' as const },
+  { id: 'x-ai/grok-imagine-image-quality', label: 'Grok Imagine', description: 'xAI — photorealistic 1K/2K', provider: 'openrouter' as const, tier: 'standard' as const },
+  { id: 'sourceful/riverflow-v2.5-pro', label: 'Riverflow V2.5 Pro', description: 'Sourceful — top-tier control', provider: 'openrouter' as const, tier: 'standard' as const },
+  { id: 'sourceful/riverflow-v2-pro', label: 'Riverflow V2 Pro', description: 'Sourceful — V2 pro quality', provider: 'openrouter' as const, tier: 'standard' as const },
+  { id: 'recraft/recraft-v4.1-utility-pro', label: 'Recraft V4.1 Utility Pro', description: 'Recraft — ~2K general purpose', provider: 'openrouter' as const, tier: 'standard' as const },
+  { id: 'recraft/recraft-v4.1', label: 'Recraft V4.1', description: 'Recraft — general purpose', provider: 'openrouter' as const, tier: 'standard' as const },
+  { id: 'recraft/recraft-v4.1-pro-vector', label: 'Recraft V4.1 Vector', description: 'Recraft — SVG vector output', provider: 'openrouter' as const, tier: 'standard' as const },
+  { id: 'openai/gpt-image-1-mini', label: 'GPT Image 1 Mini', description: 'OpenAI — fast & cost-efficient', provider: 'openrouter' as const, tier: 'standard' as const },
+  { id: 'openai/gpt-5-image-mini', label: 'GPT-5 Image Mini', description: 'OpenAI — efficient GPT-5 image', provider: 'openrouter' as const, tier: 'standard' as const },
+  // Premium
+  { id: 'black-forest-labs/flux.2-max', label: 'FLUX.2 Max', description: 'Black Forest Labs — top-tier quality', provider: 'openrouter' as const, tier: 'premium' as const },
+  { id: 'google/gemini-3-pro-image-preview', label: 'Nano Banana Pro Preview', description: 'Gemini 3 Pro image preview', provider: 'openrouter' as const, tier: 'premium' as const },
+  { id: 'openai/gpt-image-2', label: 'GPT Image 2', description: 'OpenAI — latest flagship via OpenRouter', provider: 'openrouter' as const, tier: 'premium' as const },
+  { id: 'openai/gpt-5.4-image-2', label: 'GPT-5.4 Image 2', description: 'OpenAI — GPT-5.4 image generation', provider: 'openrouter' as const, tier: 'premium' as const },
+  { id: 'openai/gpt-image-1', label: 'GPT Image 1', description: 'OpenAI — brand-safe generation', provider: 'openrouter' as const, tier: 'premium' as const },
+  { id: 'openai/gpt-5-image', label: 'GPT-5 Image', description: 'OpenAI — multimodal GPT-5 + image', provider: 'openrouter' as const, tier: 'premium' as const },
 ] as const
+
+/** Budget-first OpenRouter image fallbacks (then Pollinations Flux as last free resort). */
+export const DEFAULT_OPENROUTER_IMAGE_CHAIN = [
+  'krea/krea-2-medium-turbo',
+  'google/gemini-3.1-flash-lite-image',
+  'black-forest-labs/flux.2-klein-4b',
+  'sourceful/riverflow-v2.5-fast',
+  'google/gemini-2.5-flash-image',
+  'recraft/recraft-v4.1-utility',
+  'bytedance-seed/seedream-4.5',
+  'black-forest-labs/flux.2-pro',
+] as const
+
+export const OPENROUTER_BUDGET_IMAGE_MODELS = OPENROUTER_RENDER_MODELS.filter((m) => m.tier === 'budget')
+
+/** Env + preferred + default budget chain for OpenRouter image fallbacks. */
+export function buildOpenRouterImageChain(preferredModel?: string): string[] {
+  const chain: string[] = []
+  const push = (model?: string) => {
+    const id = model?.trim()
+    if (!id || !OPENROUTER_RENDER_MODELS.some((m) => m.id === id) || chain.includes(id)) return
+    chain.push(id)
+  }
+  push(preferredModel)
+  push(process.env.OPENROUTER_IMAGE_MODEL)
+  for (const m of (process.env.OPENROUTER_IMAGE_MODELS || '').split(',').map((s) => s.trim()).filter(Boolean)) {
+    push(m)
+  }
+  for (const m of DEFAULT_OPENROUTER_IMAGE_CHAIN) push(m)
+  return chain
+}
+
 
 export const OPENROUTER_IMAGE_RESOLUTION_OPTIONS = [
   { id: '1k', label: '1K', description: 'Fast — social posts' },
@@ -136,30 +177,31 @@ export const PIXVERSE_VIDEO_MODELS: { id: PixverseModel; label: string; descript
 export const VIDEO_MODELS = PIXVERSE_VIDEO_MODELS
 
 export const OPENROUTER_VIDEO_MODELS = [
-  // Kling (Kuaishou)
-  { id: 'kwaivgi/kling-v3.0-pro', label: 'Kling 3.0 Pro', description: 'Kuaishou — premium quality, native audio', provider: 'openrouter' as const },
-  { id: 'kwaivgi/kling-v3.0-std', label: 'Kling 3.0 Standard', description: 'Kuaishou — fast & cost-efficient', provider: 'openrouter' as const },
-  { id: 'kwaivgi/kling-video-o1', label: 'Kling Video O1', description: 'Kuaishou — cinematic, first/last frame control', provider: 'openrouter' as const },
-  // OpenAI & Google
-  { id: 'openai/sora-2-pro', label: 'Sora 2 Pro', description: 'OpenAI — premium production quality', provider: 'openrouter' as const },
-  { id: 'google/veo-3.1', label: 'Veo 3.1', description: 'Google — max visual fidelity + audio', provider: 'openrouter' as const },
-  { id: 'google/veo-3.1-fast', label: 'Veo 3.1 Fast', description: 'Google — balanced speed & quality', provider: 'openrouter' as const },
-  { id: 'google/veo-3.1-lite', label: 'Veo 3.1 Lite', description: 'Google — fast 4–8s clips', provider: 'openrouter' as const },
-  // ByteDance Seedance
-  { id: 'bytedance/seedance-2.0', label: 'Seedance 2.0', description: 'ByteDance — character consistency, up to 4K', provider: 'openrouter' as const },
-  { id: 'bytedance/seedance-2.0-fast', label: 'Seedance 2.0 Fast', description: 'ByteDance — speed-optimized video', provider: 'openrouter' as const },
-  { id: 'bytedance/seedance-1-5-pro', label: 'Seedance 1.5 Pro', description: 'ByteDance — unified audio-visual generation', provider: 'openrouter' as const },
-  // Alibaba
-  { id: 'alibaba/wan-2.7', label: 'Wan 2.7', description: 'Alibaba — reference-to-video, native audio', provider: 'openrouter' as const },
-  { id: 'alibaba/wan-2.6', label: 'Wan 2.6', description: 'Alibaba — 1080p text/image-to-video', provider: 'openrouter' as const },
-  { id: 'alibaba/happyhorse-1.1', label: 'HappyHorse 1.1', description: 'Alibaba — reference image video', provider: 'openrouter' as const },
-  { id: 'alibaba/happyhorse-1.0', label: 'HappyHorse 1.0', description: 'Alibaba — text/image-to-video', provider: 'openrouter' as const },
-  // MiniMax, xAI
-  { id: 'minimax/hailuo-2.3', label: 'Hailuo 2.3', description: 'MiniMax — 1080p text/image-to-video', provider: 'openrouter' as const },
-  { id: 'x-ai/grok-imagine-video', label: 'Grok Imagine Video', description: 'xAI — fast 1–15s clips', provider: 'openrouter' as const },
+  // Budget / lowest OpenRouter video cost
+  { id: 'bytedance/seedance-1-5-pro', label: 'Seedance 1.5 Pro', description: 'Budget — cheapest OpenRouter video tokens', provider: 'openrouter' as const, tier: 'budget' as const },
+  { id: 'bytedance/seedance-2.0-fast', label: 'Seedance 2.0 Fast', description: 'Budget — fast low-cost Seedance', provider: 'openrouter' as const, tier: 'budget' as const },
+  { id: 'alibaba/wan-2.6', label: 'Wan 2.6', description: 'Budget — ~$0.04/s at 480p', provider: 'openrouter' as const, tier: 'budget' as const },
+  { id: 'google/veo-3.1-lite', label: 'Veo 3.1 Lite', description: 'Budget — cheapest Veo (no audio cheaper)', provider: 'openrouter' as const, tier: 'budget' as const },
+  { id: 'kwaivgi/kling-v3.0-std', label: 'Kling 3.0 Standard', description: 'Budget — Kling std tier', provider: 'openrouter' as const, tier: 'budget' as const },
+  { id: 'x-ai/grok-imagine-video', label: 'Grok Imagine Video', description: 'Budget — xAI fast 1–15s clips', provider: 'openrouter' as const, tier: 'budget' as const },
+  { id: 'minimax/hailuo-2.3', label: 'Hailuo 2.3', description: 'Budget — MiniMax 1080p', provider: 'openrouter' as const, tier: 'budget' as const },
+  { id: 'alibaba/happyhorse-1.0', label: 'HappyHorse 1.0', description: 'Budget — Alibaba text/image-to-video', provider: 'openrouter' as const, tier: 'budget' as const },
+  // Standard
+  { id: 'bytedance/seedance-2.0', label: 'Seedance 2.0', description: 'ByteDance — character consistency, up to 4K', provider: 'openrouter' as const, tier: 'standard' as const },
+  { id: 'google/veo-3.1-fast', label: 'Veo 3.1 Fast', description: 'Google — balanced speed & quality', provider: 'openrouter' as const, tier: 'standard' as const },
+  { id: 'kwaivgi/kling-v3.0-pro', label: 'Kling 3.0 Pro', description: 'Kuaishou — premium quality, native audio', provider: 'openrouter' as const, tier: 'standard' as const },
+  { id: 'kwaivgi/kling-video-o1', label: 'Kling Video O1', description: 'Kuaishou — cinematic, first/last frame', provider: 'openrouter' as const, tier: 'standard' as const },
+  { id: 'alibaba/wan-2.7', label: 'Wan 2.7', description: 'Alibaba — reference-to-video, native audio', provider: 'openrouter' as const, tier: 'standard' as const },
+  { id: 'alibaba/happyhorse-1.1', label: 'HappyHorse 1.1', description: 'Alibaba — reference image video', provider: 'openrouter' as const, tier: 'standard' as const },
+  { id: 'x-ai/grok-imagine-video-1.5', label: 'Grok Imagine Video 1.5', description: 'xAI — newer Grok video', provider: 'openrouter' as const, tier: 'standard' as const },
+  // Premium
+  { id: 'google/veo-3.1', label: 'Veo 3.1', description: 'Google — max visual fidelity + audio', provider: 'openrouter' as const, tier: 'premium' as const },
+  { id: 'openai/sora-2-pro', label: 'Sora 2 Pro', description: 'OpenAI — premium production quality', provider: 'openrouter' as const, tier: 'premium' as const },
 ] as const
 
 export type OpenRouterVideoModelId = (typeof OPENROUTER_VIDEO_MODELS)[number]['id']
+
+export const OPENROUTER_BUDGET_VIDEO_MODELS = OPENROUTER_VIDEO_MODELS.filter((m) => m.tier === 'budget')
 
 /** Maps legacy/wrong slugs to current OpenRouter video model IDs. */
 export const OPENROUTER_VIDEO_MODEL_ALIASES: Record<string, OpenRouterVideoModelId> = {

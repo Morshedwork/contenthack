@@ -103,6 +103,12 @@ export default function ModelsPage() {
               ))}
             </tbody>
           </table>
+          <p className="text-xs text-muted-foreground mt-4">
+            Live fallback: if the assigned model fails, agents automatically try the fallback, then the
+            OpenRouter open-source layer stack, then Kimi. Video uses OpenRouter budget models → PixVerse.
+            Images use OpenRouter budget chain → Pollinations Flux (true free). OpenRouter has no $0
+            dedicated image/video models — budget = cheapest paid.
+          </p>
         </CardContent>
       </Card>
     </>

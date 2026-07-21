@@ -12,7 +12,8 @@ import type {
   VideoScript,
   BrandProfile,
 } from '@/types'
-import { demoAgents, demoAgentTasks, demoIntegrations, demoModels, demoModelRouting, demoROI, demoSafetySettings } from '@/lib/demo/data'
+import { demoAgents, demoAgentTasks, demoIntegrations, demoModelRouting, demoROI, demoSafetySettings } from '@/lib/demo/data'
+import { getAvailableModels } from '@/lib/models'
 
 export const INVESTOR_PITCH_CAMPAIGN_ID = 'camp-investor-pitch'
 
@@ -416,7 +417,7 @@ export function buildInvestorPitchWorkspaceSlice() {
     brandProfile: { ...investorPitchBrandProfile },
     safetySettings: { ...demoSafetySettings },
     integrations: demoIntegrations.map((i) => ({ ...i, connected: i.id === 'linkedin', mockMode: false })),
-    models: demoModels.map((m) => ({ ...m })),
+    models: getAvailableModels().map((m) => ({ ...m })),
     modelRouting: demoModelRouting.map((r) => ({ ...r })),
     lastWorkflow: {
       workflowId: 'wf-investor-pitch',

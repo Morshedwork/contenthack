@@ -181,3 +181,52 @@ export async function withOpenRouter<T>(generator: () => Promise<T>): Promise<{ 
   const result = await generator()
   return { result, live: true }
 }
+
+export async function openRouterChatCompletion(input: {
+  model: string
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
+  temperature?: number
+  maxTokens?: number
+  json?: boolean
+}): Promise<string> {
+  const body: Record<string, unknown> = {
+    model: input.model,
+    messages: input.messages,
+    temperature: input.temperature ?? 0.7,
+    max_tokens: input.maxTokens ?? 2048,
+  }
+  if (input.json) {
+    body.response_format = { type: 'json_object' }
+  }
+
+  const res = await openrouterFetch('/chat/completions', {
+    method: 'POST',
+    body: JSON.stringify(body),
+  })
+  const json = (await res.json()) as {
+    choices?: Array<{ message?: { content?: string | null; reasoning?: string | null } }>
+    error?: { message?: string }
+  }
+  if (json.error?.message) throw new Error(json.error.message)
+  const message = json.choices?.[0]?.message
+  const content = message?.content?.trim() || ''
+  if (content) return content
+  // Reasoning models (e.g. DeepSeek R1) may put text only in `reasoning`
+  const reasoning = message?.reasoning?.trim() || ''
+  if (reasoning) return reasoning.slice(0, 4000)
+  return ''
+}
+
+export async function openRouterJSONCompletion<T>(input: {
+  model: string
+  messages: Array<{ role: 'system' | 'user' | 'assistant'; content: string }>
+  temperature?: number
+  maxTokens?: number
+}): Promise<T> {
+  const text = await openRouterChatCompletion({ ...input, json: true })
+  try {
+    return JSON.parse(text || '{}') as T
+  } catch {
+    throw new Error(`OpenRouter (${input.model}) returned malformed JSON`)
+  }
+}

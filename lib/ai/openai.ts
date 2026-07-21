@@ -16,8 +16,13 @@ function getApiKey(): string | undefined {
   return process.env.OPENAI_API_KEY?.trim()
 }
 
+function isOpenAIDisabled(): boolean {
+  const flag = process.env.OPENAI_DISABLED?.trim().toLowerCase()
+  return flag === 'true' || flag === '1' || flag === 'yes'
+}
+
 export function hasOpenAI(): boolean {
-  return Boolean(getApiKey())
+  return Boolean(getApiKey()) && !isOpenAIDisabled()
 }
 
 export function requireOpenAI(): void {

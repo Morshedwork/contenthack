@@ -1,4 +1,6 @@
 import { demoModels, demoModelRouting } from '@/lib/demo/data'
+import { hasOpenAI } from '@/lib/ai/openai'
+import { hasOpenRouter } from '@/lib/ai/openrouter'
 import type { AIModel, ModelRouting } from '@/types'
 
 export {
@@ -7,6 +9,8 @@ export {
   resolveMediaModel,
   assignedModelLabel,
   modelDisplayNameToId,
+  buildModelChain,
+  textLayerSummary,
   AGENT_TASK_MAP,
   type TaskModelConfig,
   type ModelTaskType,
@@ -20,6 +24,9 @@ export {
   IMAGE_ASPECT_RATIOS,
   OPENROUTER_RENDER_MODELS,
   OPENROUTER_VIDEO_MODELS,
+  OPENROUTER_BUDGET_IMAGE_MODELS,
+  OPENROUTER_BUDGET_VIDEO_MODELS,
+  DEFAULT_OPENROUTER_IMAGE_CHAIN,
   OPENROUTER_IMAGE_QUALITY_OPTIONS,
   OPENROUTER_IMAGE_RESOLUTION_OPTIONS,
   OPENROUTER_VIDEO_RESOLUTIONS,
@@ -46,8 +53,33 @@ export {
   type VideoProvider,
 } from './media-options'
 
+export {
+  OPENROUTER_TEXT_MODELS,
+  DEFAULT_OPENROUTER_TEXT_MODEL,
+  DEFAULT_OPENROUTER_TEXT_CHAIN,
+  isOpenRouterTextModel,
+  type OpenRouterTextModelId,
+} from './openrouter-text'
+
+export function getAvailableModels(): AIModel[] {
+  let filtered = demoModels.filter((m) => m.id !== 'mock')
+  if (!hasOpenAI()) filtered = filtered.filter((m) => m.provider !== 'OpenAI')
+  if (!hasOpenRouter()) filtered = filtered.filter((m) => m.provider !== 'OpenRouter')
+
+  const preferredDefault = hasOpenRouter()
+    ? 'deepseek/deepseek-v3.2'
+    : hasOpenAI()
+      ? 'gpt-4o'
+      : 'kimi-k2.5'
+
+  return filtered.map((m) => ({
+    ...m,
+    isDefault: m.id === preferredDefault,
+  }))
+}
+
 export function getModels(): AIModel[] {
-  return demoModels.filter((m) => m.id !== 'mock')
+  return getAvailableModels()
 }
 
 export function getModelRouting(): ModelRouting[] {
