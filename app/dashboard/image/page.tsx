@@ -36,7 +36,7 @@ import { SelectGroup, SelectLabel } from '@/components/ui/select'
 import { BrandThemeReferenceSelect } from '@/components/brand/brand-theme-reference-select'
 import { useWorkspace } from '@/hooks/use-workspace'
 import type { GeneratedImage } from '@/types'
-import { Archive, Copy, Download, ImageIcon, Loader2, Sparkles } from 'lucide-react'
+import { Archive, Check, Copy, Download, ImageIcon, Loader2, Sparkles, WandSparkles } from 'lucide-react'
 import { toast } from 'sonner'
 
 export default function ImageStudioPage() {
@@ -66,6 +66,9 @@ export default function ImageStudioPage() {
   const [latest, setLatest] = useState<GeneratedImage | null>(null)
   const [hasOpenAI, setHasOpenAI] = useState(false)
   const [hasOpenRouter, setHasOpenRouter] = useState(false)
+  const [batchSize, setBatchSize] = useState<4 | 5>(5)
+  const [uniqueModels, setUniqueModels] = useState(true)
+  const [batchProgress, setBatchProgress] = useState(0)
 
   useEffect(() => {
     if (data?.generatedImages) setImages(data.generatedImages)
@@ -138,6 +141,99 @@ export default function ImageStudioPage() {
     }
   }
 
+  const handleGenerateDemoImage = async () => {
+    setLoading(true)
+    const demoPrompt =
+      prompt.trim() ||
+      `Demo hero image for ${data?.campaign.companyName || 'ContentOps AI'} with agent workflow, social content cards, lead pipeline, and polished SaaS dashboard visuals`
+    try {
+      const res = await fetch('/api/media/image/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt: demoPrompt,
+          aspectRatio,
+          customPromptDetails: customPromptDetails.trim() || undefined,
+          demoFallback: true,
+        }),
+      })
+      const json = await res.json()
+      if (!json.success) throw new Error(json.error || 'Demo image generation failed')
+      setLatest(json.data.image)
+      setImages(json.data.images)
+      await refresh()
+      toast.success('Demo image generated')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to generate demo image')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const handleBatchGenerate = async () => {
+    if (!prompt.trim()) {
+      toast.error('Add a campaign brief before generating the poster set')
+      return
+    }
+    setLoading(true)
+    setBatchProgress(0)
+    const concepts = [
+      'hero-led editorial composition with one bold focal subject',
+      'human-centered story with a candid, energetic moment',
+      'minimal product-first composition with generous negative space',
+      'cinematic scene with dramatic light and depth',
+      'graphic poster treatment with strong geometric framing',
+    ]
+    const availableModels = [
+      ...POLLINATIONS_RENDER_MODELS.map((m) => m.id),
+      ...(hasOpenRouter ? OPENROUTER_RENDER_MODELS.filter((m) => m.tier !== 'premium').map((m) => m.id) : []),
+      ...(hasOpenAI ? OPENAI_RENDER_MODELS.map((m) => m.id) : []),
+    ] as ImageRenderModelId[]
+    const modelPool = uniqueModels
+      ? availableModels.filter((model, index, all) => all.indexOf(model) === index).slice(0, batchSize)
+      : [renderModel]
+    const generated: GeneratedImage[] = []
+    try {
+      for (let i = 0; i < batchSize; i += 1) {
+        const posterModel = modelPool[i % modelPool.length] || renderModel
+        const variantPrompt = `${prompt.trim()}\n\nCreate poster ${i + 1} of ${batchSize} as a genuinely different creative direction: ${concepts[i]}. Do not reuse the same layout, camera angle, subject placement, or color balance from other posters. Keep the brand direction consistent. Avoid text unless explicitly requested.`
+        const posterProvider = getImageRenderProvider(posterModel)
+        const posterIsGpt = isGptImageRenderModel(posterModel)
+        const posterIsGpt2 = isGptImage2RenderModel(posterModel)
+        const res = await fetch('/api/media/image/generate', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            prompt: variantPrompt,
+            promptModel,
+            renderModel: posterModel,
+            aspectRatio,
+            openaiQuality: posterModel === 'dall-e-3' ? openaiQuality : undefined,
+            gptImageQuality: posterProvider === 'openai' && posterIsGpt ? gptImageQuality : undefined,
+            gptImage2Resolution: posterProvider === 'openai' && posterIsGpt2 ? gptImage2Resolution : undefined,
+            gptImageThinking: posterProvider === 'openai' && posterIsGpt2 ? gptImageThinking : undefined,
+            openrouterResolution: posterProvider === 'openrouter' ? openrouterResolution : undefined,
+            openrouterQuality: posterProvider === 'openrouter' ? openrouterQuality : undefined,
+            customPromptDetails: customPromptDetails.trim() || undefined,
+            brandThemeId: brandThemeId && brandThemeId !== 'none' ? brandThemeId : undefined,
+          }),
+        })
+        const json = await res.json()
+        if (!json.success) throw new Error(json.error || `Poster ${i + 1} failed`)
+        generated.push(json.data.image)
+        setLatest(json.data.image)
+        setImages((current) => [json.data.image, ...current].slice(0, 20))
+        setBatchProgress(i + 1)
+      }
+      await refresh()
+      toast.success(`${generated.length} unique posters generated`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Poster set generation failed')
+    } finally {
+      setLoading(false)
+    }
+  }
+
   const downloadImage = (image: GeneratedImage) => {
     const link = document.createElement('a')
     link.href = image.imageUrl
@@ -173,10 +269,11 @@ export default function ImageStudioPage() {
         <CardHeader className="pb-3">
           <CardTitle className="text-base flex items-center gap-2">
             <Sparkles className="size-4 text-violet-400" />
-            Generate marketing image
+            <span>Build a poster set</span>
+            <Badge variant="outline" className="ml-auto text-[10px]">4–5 concepts</Badge>
           </CardTitle>
           <p className="text-xs text-muted-foreground font-normal">
-            Free = Pollinations. OpenRouter Budget = cheapest paid (no true $0 image models on OpenRouter).
+            Start with one campaign brief. Studio turns it into a cohesive set of distinct poster directions.
           </p>
         </CardHeader>
         <CardContent className="flex flex-col gap-4">
@@ -411,15 +508,40 @@ export default function ImageStudioPage() {
             description="Visual direction — style, colors, composition, platform (Instagram/LinkedIn), mood."
             placeholder="e.g. Photorealistic, purple and blue brand colors, clean minimal layout, no text overlay, 1:1 aspect for Instagram..."
           />
-          <div className="flex justify-end">
-            <Button onClick={() => void handleGenerate()} disabled={loading}>
+          <div className="flex flex-col gap-3 rounded-xl border border-border/60 bg-background/30 p-4 sm:flex-row sm:items-center sm:justify-between">
+            <div className="flex flex-wrap items-center gap-2 text-sm">
+              <Label htmlFor="batch-size" className="text-muted-foreground">Poster set</Label>
+              <Select value={String(batchSize)} onValueChange={(v) => setBatchSize(Number(v) as 4 | 5)}>
+                <SelectTrigger id="batch-size" className="h-9 w-24"><SelectValue /></SelectTrigger>
+                <SelectContent><SelectItem value="4">4 posters</SelectItem><SelectItem value="5">5 posters</SelectItem></SelectContent>
+              </Select>
+              <button type="button" onClick={() => setUniqueModels((v) => !v)} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-xs text-muted-foreground hover:bg-secondary" aria-pressed={uniqueModels}>
+                <span className={`flex size-4 items-center justify-center rounded border ${uniqueModels ? 'border-violet-400 bg-violet-400 text-black' : 'border-border'}`}>{uniqueModels && <Check className="size-3" />}</span>
+                Rotate unique models
+              </button>
+            </div>
+            <div className="flex flex-wrap justify-end gap-2">
+              <Button variant="outline" onClick={() => void handleGenerateDemoImage()} disabled={loading}>
+                {loading ? (
+                  <Loader2 className="animate-spin" data-icon="inline-start" />
+                ) : (
+                  <WandSparkles data-icon="inline-start" />
+                )}
+                Demo image
+              </Button>
+              <Button variant="outline" onClick={() => void handleGenerate()} disabled={loading}>
               {loading ? (
                 <Loader2 className="animate-spin" data-icon="inline-start" />
               ) : (
                 <Sparkles data-icon="inline-start" />
               )}
-              {loading ? 'Generating...' : 'Generate Image'}
-            </Button>
+              {loading ? 'Generating...' : 'Single image'}
+              </Button>
+              <Button onClick={() => void handleBatchGenerate()} disabled={loading} className="min-w-40">
+                {loading ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <WandSparkles data-icon="inline-start" />}
+                {loading ? `Poster ${batchProgress}/${batchSize}` : `Generate ${batchSize} posters`}
+              </Button>
+            </div>
           </div>
         </CardContent>
       </Card>

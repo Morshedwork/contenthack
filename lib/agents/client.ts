@@ -31,18 +31,19 @@ export async function runAgent(
   )
 }
 
-export async function runFullWorkflow(customPromptDetails?: string): Promise<{
+export async function runFullWorkflow(customPromptDetails?: string, options?: { demoFast?: boolean }): Promise<{
   workflowId: string
   steps: { agentId: string; agentName: string; status: string; progress: number }[]
   estimatedTimeSaved: string
   agents: AgentDefinition[]
   live?: boolean
+  demo?: boolean
 }> {
   return parseApi(
     await fetch('/api/agents/runFullWorkflow', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ customPromptDetails }),
+      body: JSON.stringify({ customPromptDetails, demoFast: options?.demoFast }),
     }),
   )
 }

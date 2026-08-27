@@ -173,6 +173,13 @@ function normalizeBrandProfile(profile: BrandProfile): BrandProfile {
 }
 
 async function loadState(ctx: WorkspaceContext): Promise<WorkspaceState> {
+  if (ctx.workspaceId === DEMO_WORKSPACE_ID) {
+    const state = (await loadWorkspaceState(ctx.workspaceId)) ?? cloneDemoDefaults()
+    state.brandProfile = normalizeBrandProfile(state.brandProfile)
+    cache.set(ctx.workspaceId, state)
+    return state
+  }
+
   let state = cache.get(ctx.workspaceId)
   if (!state) {
     const fromDb = await loadWorkspaceState(ctx.workspaceId)

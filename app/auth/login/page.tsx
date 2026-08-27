@@ -13,12 +13,21 @@ async function signInWithAutoConfirm(email: string, password: string) {
   const supabase = createClient()
   let result = await supabase.auth.signInWithPassword({ email, password })
 
-  if (result.error?.message === 'Email not confirmed') {
-    await fetch('/api/auth/confirm', {
+  const needsConfirmation =
+    result.error?.code === 'email_not_confirmed' ||
+    result.error?.message.toLowerCase() === 'email not confirmed'
+
+  if (needsConfirmation) {
+    const response = await fetch('/api/auth/confirm', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email }),
     })
+    const body = await response.json().catch(() => ({}))
+    if (!response.ok || !body.success) {
+      throw new Error(body.error ?? 'Unable to confirm your email')
+    }
+
     result = await supabase.auth.signInWithPassword({ email, password })
   }
 
@@ -38,12 +47,6 @@ export default function LoginPage() {
     setError(null)
 
     try {
-      await fetch('/api/auth/login', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email }),
-      })
-
       const { error: signInError } = await signInWithAutoConfirm(email, password)
       if (signInError) throw signInError
 

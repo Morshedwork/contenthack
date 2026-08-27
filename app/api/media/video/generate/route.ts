@@ -1,6 +1,6 @@
 import { apiFromError, apiSuccess } from '@/lib/api-utils'
 import { mergeCrustdataSignals } from '@/lib/ai/crustdata'
-import { generateMarketingVideo, mediaProvidersAvailable } from '@/lib/ai/media-generate'
+import { buildDemoMarketingVideo, generateMarketingVideo, mediaProvidersAvailable } from '@/lib/ai/media-generate'
 import {
   isValidOpenRouterVideoDuration,
   isValidOpenRouterVideoResolution,
@@ -28,6 +28,23 @@ export async function POST(request: Request) {
     const ws = await getWorkspace(ctx)
     const prompt = String(body.prompt || body.topic || '').trim()
     if (!prompt) return apiFromError(new Error('Prompt is required'), 'Prompt is required')
+
+    if (body.demoFallback === true) {
+      const video = buildDemoMarketingVideo({
+        prompt,
+        duration: typeof body.duration === 'number' ? body.duration : 5,
+        aspectRatio: typeof body.aspectRatio === 'string' ? body.aspectRatio : '9:16',
+      })
+      const videos = [video, ...(ws.generatedVideos ?? [])].slice(0, 10)
+      await patchWorkspace({ generatedVideos: videos }, ctx)
+      return apiSuccess({
+        video,
+        videos,
+        live: false,
+        provider: video.provider.toLowerCase(),
+        layer: videoLayerSummary(),
+      })
+    }
 
     const videoProvider =
       typeof body.videoProvider === 'string' && isValidVideoProvider(body.videoProvider)
@@ -70,7 +87,7 @@ export async function POST(request: Request) {
       typeof body.quality === 'string' && isValidVideoQuality(body.quality) ? body.quality : '720p'
 
     const media = mediaProvidersAvailable()
-    if (!media.openrouter && !media.pixverse) {
+    if (!media.openrouter && !media.pixverse && body.liveOnly === true) {
       return apiFromError(
         new Error('No video provider configured. Add OPENROUTER_API_KEY and/or PIXVERSE_API_KEY.'),
         'Video provider not configured',
@@ -102,7 +119,7 @@ export async function POST(request: Request) {
     return apiSuccess({
       video,
       videos,
-      live: media.openrouter || media.pixverse,
+      live: !video.provider.toLowerCase().includes('demo') && (media.openrouter || media.pixverse),
       provider: video.provider.toLowerCase(),
       layer: videoLayerSummary(),
     })

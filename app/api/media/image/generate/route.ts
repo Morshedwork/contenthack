@@ -1,6 +1,6 @@
 import { apiFromError, apiSuccess } from '@/lib/api-utils'
 import { mergeCrustdataSignals } from '@/lib/ai/crustdata'
-import { generateMarketingImage } from '@/lib/ai/media-generate'
+import { buildDemoMarketingImage, generateMarketingImage } from '@/lib/ai/media-generate'
 import {
   getImageRenderProvider,
   isValidImageAspectRatio,
@@ -22,6 +22,19 @@ export async function POST(request: Request) {
     const ws = await getWorkspace(ctx)
     const prompt = String(body.prompt || '').trim()
     if (!prompt) return apiFromError(new Error('Prompt is required'), 'Prompt is required')
+
+    if (body.demoFallback === true) {
+      const image = buildDemoMarketingImage({
+        prompt,
+        brandProfile: ws.brandProfile,
+        aspectRatio: typeof body.aspectRatio === 'string' ? body.aspectRatio : '16:9',
+        enhancedPrompt: body.customPromptDetails ? `${prompt}. ${body.customPromptDetails}` : prompt,
+        promptModelLabel: 'demo-prompt',
+      })
+      const images = [image, ...(ws.generatedImages ?? [])].slice(0, 20)
+      await patchWorkspace({ generatedImages: images }, ctx)
+      return apiSuccess({ image, images, live: false, provider: image.provider })
+    }
 
     const promptModel =
       typeof body.promptModel === 'string' && isValidImagePromptModel(body.promptModel)
@@ -80,8 +93,9 @@ export async function POST(request: Request) {
     const images = [image, ...(ws.generatedImages ?? [])].slice(0, 20)
     await patchWorkspace({ generatedImages: images }, ctx)
 
-    const provider = getImageRenderProvider(renderModel || 'flux') || 'pollinations'
-    return apiSuccess({ image, images, live: true, provider })
+    const provider = image.provider || getImageRenderProvider(renderModel || 'flux') || 'pollinations'
+    const live = !provider.toLowerCase().includes('demo')
+    return apiSuccess({ image, images, live, provider })
   } catch (err) {
     return apiFromError(err, 'Image generation failed')
   }

@@ -1,6 +1,7 @@
 'use client'
 
 import Link from 'next/link'
+import { motion } from 'framer-motion'
 import { Area, AreaChart, CartesianGrid, XAxis, YAxis } from 'recharts'
 import { Badge } from '@/components/ui/badge'
 import { Button } from '@/components/ui/button'
@@ -20,6 +21,7 @@ import {
   CheckSquare,
   Clock,
   FileText,
+  ImageIcon,
   MessageSquare,
   Mic,
   Megaphone,
@@ -78,6 +80,9 @@ export default function OverviewPage() {
   }
 
   const { overviewKPIs, roi, agents, calendarPosts, topics, leads, publishLogs, campaign, approvalItems, tasks } = data
+  const previewDrafts = data.contentDrafts.slice(0, 3)
+  const previewImages = (data.generatedImages ?? []).slice(0, 4)
+  const previewVideos = (data.generatedVideos ?? []).slice(0, 2)
   const topicTitles = topics.length ? topics.map((t) => t.title) : []
   const activeAgents = agents.filter((a) => a.status === 'running' || a.status === 'waiting_for_approval')
   const pendingApprovals = approvalItems.filter((a) => a.status === 'needs_review').length
@@ -90,6 +95,92 @@ export default function OverviewPage() {
     leads: String(leads.length),
     agents: String(activeAgents.length),
   }
+
+  const completedAgents = agents.filter((a) => a.status === 'completed').length
+  const successfulPublishes = publishLogs.filter((log) => log.status === 'success').length
+  const demoFlow = [
+    {
+      label: 'Campaign setup',
+      href: '/dashboard/campaign-builder',
+      icon: Target,
+      metric: campaign.status === 'active' ? 'Active' : 'Draft',
+      detail: 'Offer, audience, ICP, channels, and campaign goal are ready for the agent run.',
+      status: 'Start here',
+      tone: 'border-violet-500/30 bg-violet-500/10 text-violet-200',
+    },
+    {
+      label: 'Research scan',
+      href: '/dashboard/research',
+      icon: Sparkles,
+      metric: data.research ? `${data.research.opportunityScore} score` : 'Ready',
+      detail: 'Market signals and competitor gaps become angles the strategy agent can use.',
+      status: 'Insight',
+      tone: 'border-blue-500/30 bg-blue-500/10 text-blue-200',
+    },
+    {
+      label: 'Agent workflow',
+      href: '/dashboard/agents',
+      icon: Bot,
+      metric: `${completedAgents}/${agents.length || workflowSteps.length} done`,
+      detail: 'The full agent chain moves work from plan to content, video, outreach, and analytics.',
+      status: activeAgents.length ? 'Live now' : 'Standby',
+      tone: 'border-emerald-500/30 bg-emerald-500/10 text-emerald-200',
+    },
+    {
+      label: 'Content studio',
+      href: '/dashboard/content',
+      icon: FileText,
+      metric: `${data.contentDrafts.length} drafts`,
+      detail: 'Generated posts, hooks, captions, and channel variants are ready to review.',
+      status: 'Create',
+      tone: 'border-cyan-500/30 bg-cyan-500/10 text-cyan-200',
+    },
+    {
+      label: 'Image generation',
+      href: '/dashboard/image',
+      icon: ImageIcon,
+      metric: `${data.generatedImages?.length ?? 0} images`,
+      detail: 'Poster, ad, and social creative generation proves the visual part of the demo.',
+      status: 'Visuals',
+      tone: 'border-sky-500/30 bg-sky-500/10 text-sky-200',
+    },
+    {
+      label: 'Video assets',
+      href: '/dashboard/video',
+      icon: Video,
+      metric: `${data.videoScripts.length} scripts`,
+      detail: 'Video briefs and scripts convert campaign angles into demo-ready creative.',
+      status: 'Media',
+      tone: 'border-rose-500/30 bg-rose-500/10 text-rose-200',
+    },
+    {
+      label: 'Approve queue',
+      href: '/dashboard/approval',
+      icon: CheckSquare,
+      metric: `${pendingApprovals} reviews`,
+      detail: 'Human review keeps the demo safe before posts move into publishing.',
+      status: pendingApprovals ? 'Review' : 'Clear',
+      tone: 'border-amber-500/30 bg-amber-500/10 text-amber-200',
+    },
+    {
+      label: 'Leads and outreach',
+      href: '/dashboard/leads',
+      icon: Users,
+      metric: `${leads.length} leads`,
+      detail: 'Prospects, scores, and outbound actions show how content turns into pipeline.',
+      status: 'Convert',
+      tone: 'border-fuchsia-500/30 bg-fuchsia-500/10 text-fuchsia-200',
+    },
+    {
+      label: 'Proof and ROI',
+      href: '/dashboard/analytics',
+      icon: TrendingUp,
+      metric: `${roi.weeklyHoursSaved}h saved`,
+      detail: `${successfulPublishes} publish logs and performance metrics close the demo story.`,
+      status: 'Measure',
+      tone: 'border-lime-500/30 bg-lime-500/10 text-lime-200',
+    },
+  ]
 
   const primaryKPIs = overviewKPIs.slice(0, 4)
   const secondaryKPIs = overviewKPIs.slice(4)
@@ -201,6 +292,216 @@ export default function OverviewPage() {
             </Link>
           </div>
           <WorkflowPipeline steps={workflowSteps} activeIndex={pipelineIndex} compact />
+        </div>
+      </section>
+
+      {/* Demo working flow */}
+      <motion.section
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.45, ease: [0.22, 1, 0.36, 1] }}
+        className="relative overflow-hidden rounded-2xl dash-card p-5 md:p-6"
+      >
+        <div className="absolute inset-0 dot-grid opacity-25 pointer-events-none" />
+        <div className="relative flex flex-col gap-5">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0">
+              <div className="mb-3 flex flex-wrap items-center gap-2">
+                <Badge variant="outline" className="border-emerald-500/35 bg-emerald-500/10 text-emerald-300">
+                  <Sparkles data-icon="inline-start" className="size-3" />
+                  Full demo flow
+                </Badge>
+                <Badge variant="outline" className="border-violet-500/35 text-violet-300">
+                  {completedAgents}/{agents.length || workflowSteps.length} agents updated
+                </Badge>
+                <Badge variant="outline" className="border-blue-500/35 text-blue-300">
+                  {data.contentDrafts.length + data.videoScripts.length + (data.generatedImages?.length ?? 0)} assets generated
+                </Badge>
+              </div>
+              <h2 className="section-title">Demo Working Flow</h2>
+              <p className="section-subtitle mt-1 max-w-2xl">
+                A single walkthrough for demos: setup the campaign, run agents, review creative, publish, then prove the ROI.
+              </p>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {showQuickDemo && (
+                <QuickDemoStart size="sm" label="Load Demo" className="rounded-xl" />
+              )}
+              <Button asChild size="sm" variant="outline" className="rounded-xl border-violet-500/30">
+                <Link href="/dashboard/agents">
+                  <Zap data-icon="inline-start" />
+                  Run Full Workflow
+                </Link>
+              </Button>
+            </div>
+          </div>
+
+          <div className="relative h-2 overflow-hidden rounded-full bg-secondary/60">
+            <motion.div
+              initial={{ width: '12%' }}
+              animate={{ width: `${Math.min(100, Math.max(24, (completedAgents / Math.max(agents.length, 1)) * 100))}%` }}
+              transition={{ duration: 0.9, ease: [0.22, 1, 0.36, 1] }}
+              className="h-full rounded-full bg-gradient-to-r from-violet-400 via-blue-400 to-emerald-400"
+            />
+            <motion.div
+              aria-hidden="true"
+              animate={{ x: ['-20%', '120%'] }}
+              transition={{ duration: 2.4, repeat: Infinity, ease: 'linear' }}
+              className="absolute inset-y-0 left-0 w-1/3 bg-white/25 blur-sm"
+            />
+          </div>
+
+          <div className="grid grid-cols-1 gap-px overflow-hidden rounded-2xl border border-border/40 bg-border/30 sm:grid-cols-2 xl:grid-cols-3">
+            {demoFlow.map((step, index) => {
+              const Icon = step.icon
+              return (
+                <motion.div
+                  key={step.label}
+                  initial={{ opacity: 0, y: 14 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  transition={{ duration: 0.35, delay: 0.06 * index, ease: [0.22, 1, 0.36, 1] }}
+                >
+                  <Link
+                    href={step.href}
+                    className="group relative flex min-h-[11rem] flex-col bg-background/60 p-4 transition-colors hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-violet-400/70"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className={cn('flex size-10 shrink-0 items-center justify-center rounded-xl border', step.tone)}>
+                        <Icon className="size-5" />
+                      </div>
+                      <div className="text-right">
+                        <span className="font-mono text-[11px] text-muted-foreground">{String(index + 1).padStart(2, '0')}</span>
+                        <p className="mt-1 rounded-full bg-secondary/70 px-2 py-0.5 text-[11px] font-medium text-foreground/80">
+                          {step.status}
+                        </p>
+                      </div>
+                    </div>
+                    <div className="mt-4">
+                      <p className="text-base font-semibold leading-tight">{step.label}</p>
+                      <p className="mt-2 line-clamp-3 text-xs leading-relaxed text-muted-foreground">{step.detail}</p>
+                    </div>
+                    <div className="mt-auto flex items-center justify-between gap-3 pt-4">
+                      <span className="min-w-0 truncate rounded-full bg-background/70 px-2.5 py-1 text-xs font-medium text-foreground/90 ring-1 ring-border/40">
+                        {step.metric}
+                      </span>
+                      <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-violet-300 group-hover:text-violet-200">
+                        Open <ArrowUpRight className="size-3.5" />
+                      </span>
+                    </div>
+                  </Link>
+                </motion.div>
+              )
+            })}
+          </div>
+        </div>
+      </motion.section>
+
+      {/* Content previews */}
+      <section className="dash-card overflow-hidden p-5 md:p-6">
+        <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+          <div>
+            <div className="mb-2 flex items-center gap-2">
+              <Badge variant="outline" className="border-cyan-500/35 bg-cyan-500/10 text-cyan-300">
+                <Sparkles data-icon="inline-start" className="size-3" />
+                Review before you open a Studio
+              </Badge>
+            </div>
+            <h2 className="section-title">Content Preview</h2>
+            <p className="section-subtitle mt-1">Posts, posters, and video assets from this campaign in one review surface.</p>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            <Button asChild size="sm" variant="outline" className="rounded-xl">
+              <Link href="/dashboard/content">Open Content Studio <ArrowUpRight className="size-3.5" /></Link>
+            </Button>
+            <Button asChild size="sm" variant="ghost" className="rounded-xl">
+              <Link href="/dashboard/library">View Library <ArrowUpRight className="size-3.5" /></Link>
+            </Button>
+          </div>
+        </div>
+
+        <div className="grid grid-cols-1 gap-4 xl:grid-cols-12">
+          <div className="min-w-0 xl:col-span-5">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <FileText className="size-4 text-emerald-300" />
+                <h3 className="text-sm font-semibold">Social posts</h3>
+              </div>
+              <Badge variant="secondary" className="text-[11px]">{data.contentDrafts.length} drafts</Badge>
+            </div>
+            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+              {previewDrafts.map((draft) => (
+                <article key={draft.id} className="rounded-xl border border-border/40 bg-background/45 p-4 transition-colors hover:border-emerald-400/30 hover:bg-background/65">
+                  <div className="mb-3 flex items-center justify-between gap-3">
+                    <Badge variant="outline" className="capitalize text-[11px]">{draft.platform}</Badge>
+                    <span className="text-[11px] capitalize text-muted-foreground">{draft.status.replace(/_/g, ' ')}</span>
+                  </div>
+                  <p className="text-sm font-semibold leading-snug">{draft.hook}</p>
+                  <p className="mt-2 line-clamp-4 text-xs leading-relaxed text-muted-foreground">{draft.mainCopy}</p>
+                  <p className="mt-3 text-xs font-medium text-emerald-300">{draft.cta}</p>
+                  {draft.hashtags.length > 0 && <p className="mt-2 line-clamp-1 text-[11px] text-muted-foreground">{draft.hashtags.join(' ')}</p>}
+                </article>
+              ))}
+              {previewDrafts.length === 0 && <p className="rounded-xl border border-dashed border-border/50 p-6 text-center text-sm text-muted-foreground">Run the Content Agent to preview posts here.</p>}
+            </div>
+          </div>
+
+          <div className="min-w-0 xl:col-span-4">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <ImageIcon className="size-4 text-sky-300" />
+                <h3 className="text-sm font-semibold">Poster previews</h3>
+              </div>
+              <Badge variant="secondary" className="text-[11px]">{previewImages.length} shown</Badge>
+            </div>
+            {previewImages.length > 0 ? (
+              <div className="grid grid-cols-2 gap-3">
+                {previewImages.map((image) => (
+                  <Link key={image.id} href="/dashboard/image" className="group overflow-hidden rounded-xl border border-border/40 bg-background/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-sky-400/70">
+                    <div className="aspect-square overflow-hidden bg-secondary/30">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img src={image.imageUrl} alt={image.prompt} className="h-full w-full object-cover transition-transform duration-500 group-hover:scale-105" />
+                    </div>
+                    <div className="p-3">
+                      <p className="line-clamp-2 text-xs font-medium">{image.prompt}</p>
+                      <p className="mt-1 text-[11px] text-muted-foreground">{image.model} · {image.aspectRatio}</p>
+                    </div>
+                  </Link>
+                ))}
+              </div>
+            ) : (
+              <Link href="/dashboard/image" className="flex min-h-48 flex-col items-center justify-center rounded-xl border border-dashed border-border/50 bg-background/25 p-6 text-center transition-colors hover:border-sky-400/40 hover:bg-sky-500/5">
+                <ImageIcon className="mb-3 size-7 text-sky-300/70" />
+                <p className="text-sm font-medium">No posters yet</p>
+                <p className="mt-1 text-xs text-muted-foreground">Generate a 4–5 poster set in Image Studio.</p>
+              </Link>
+            )}
+          </div>
+
+          <div className="min-w-0 xl:col-span-3">
+            <div className="mb-3 flex items-center justify-between">
+              <div className="flex items-center gap-2">
+                <Video className="size-4 text-rose-300" />
+                <h3 className="text-sm font-semibold">Video previews</h3>
+              </div>
+              <Badge variant="secondary" className="text-[11px]">{data.generatedVideos?.length ?? 0} assets</Badge>
+            </div>
+            <div className="flex flex-col gap-3">
+              {previewVideos.map((video) => (
+                <Link key={video.id} href="/dashboard/video" className="group overflow-hidden rounded-xl border border-border/40 bg-background/45 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-rose-400/70">
+                  {video.videoUrl ? (
+                    <video src={video.videoUrl} muted controls className="aspect-video w-full bg-black object-cover" aria-label={`Preview of ${video.prompt}`} />
+                  ) : (
+                    <div className="flex aspect-video items-center justify-center bg-gradient-to-br from-rose-500/15 via-violet-500/10 to-background text-xs text-muted-foreground">Video processing</div>
+                  )}
+                  <div className="p-3">
+                    <p className="line-clamp-2 text-xs font-medium">{video.prompt}</p>
+                    <p className="mt-1 text-[11px] text-muted-foreground">{video.model} · {video.duration}s</p>
+                  </div>
+                </Link>
+              ))}
+              {previewVideos.length === 0 && <Link href="/dashboard/video" className="flex min-h-48 flex-col items-center justify-center rounded-xl border border-dashed border-border/50 bg-background/25 p-6 text-center transition-colors hover:border-rose-400/40 hover:bg-rose-500/5"><Video className="mb-3 size-7 text-rose-300/70" /><p className="text-sm font-medium">No videos yet</p><p className="mt-1 text-xs text-muted-foreground">Generate scripts or a campaign video.</p></Link>}
+            </div>
+          </div>
         </div>
       </section>
 

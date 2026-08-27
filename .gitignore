@@ -17,3 +17,5 @@ node_modules
 .DS_Store
 *.tsbuildinfo
 .gstack/
+.contentops-demo-workspace.json
+.playwright-mcp/

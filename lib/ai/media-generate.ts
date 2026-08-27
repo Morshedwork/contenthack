@@ -61,6 +61,114 @@ Offer: ${p.mainOffer}`
 
 const id = (prefix: string) => `${prefix}-${Date.now().toString(36)}`
 
+function escapeXml(value: string): string {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&apos;')
+}
+
+function demoImageDimensions(aspectRatio?: string): { width: number; height: number } {
+  switch (aspectRatio) {
+    case '16:9':
+      return { width: 1344, height: 768 }
+    case '9:16':
+      return { width: 768, height: 1344 }
+    case '4:3':
+      return { width: 1152, height: 896 }
+    default:
+      return { width: 1024, height: 1024 }
+  }
+}
+
+function buildDemoImageDataUrl(input: {
+  prompt: string
+  brandProfile?: BrandProfile
+  aspectRatio?: string
+}): string {
+  const { width, height } = demoImageDimensions(input.aspectRatio)
+  const brand = escapeXml(input.brandProfile?.brandName || DEMO_COMPANY.name)
+  const prompt = escapeXml(input.prompt.replace(/\s+/g, ' ').slice(0, 120))
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="${width}" height="${height}" viewBox="0 0 ${width} ${height}">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#0b1020"/>
+      <stop offset="48%" stop-color="#21123d"/>
+      <stop offset="100%" stop-color="#052224"/>
+    </linearGradient>
+    <linearGradient id="accent" x1="0" y1="0" x2="1" y2="0">
+      <stop offset="0%" stop-color="#a78bfa"/>
+      <stop offset="50%" stop-color="#38bdf8"/>
+      <stop offset="100%" stop-color="#34d399"/>
+    </linearGradient>
+    <filter id="glow"><feGaussianBlur stdDeviation="18" result="b"/><feMerge><feMergeNode in="b"/><feMergeNode in="SourceGraphic"/></feMerge></filter>
+  </defs>
+  <rect width="100%" height="100%" fill="url(#bg)"/>
+  <g opacity="0.25">
+    <path d="M0 ${height * 0.18} H${width} M0 ${height * 0.38} H${width} M0 ${height * 0.58} H${width} M0 ${height * 0.78} H${width}" stroke="#ffffff" stroke-width="1"/>
+    <path d="M${width * 0.18} 0 V${height} M${width * 0.38} 0 V${height} M${width * 0.58} 0 V${height} M${width * 0.78} 0 V${height}" stroke="#ffffff" stroke-width="1"/>
+  </g>
+  <circle cx="${width * 0.78}" cy="${height * 0.22}" r="${Math.min(width, height) * 0.2}" fill="#8b5cf6" opacity="0.25" filter="url(#glow)">
+    <animate attributeName="r" values="${Math.min(width, height) * 0.16};${Math.min(width, height) * 0.22};${Math.min(width, height) * 0.16}" dur="4s" repeatCount="indefinite"/>
+  </circle>
+  <rect x="${width * 0.08}" y="${height * 0.16}" width="${width * 0.5}" height="${height * 0.58}" rx="28" fill="#090b12" opacity="0.82" stroke="#7c3aed"/>
+  <rect x="${width * 0.12}" y="${height * 0.24}" width="${width * 0.28}" height="18" rx="9" fill="url(#accent)"/>
+  <rect x="${width * 0.12}" y="${height * 0.32}" width="${width * 0.38}" height="14" rx="7" fill="#64748b" opacity="0.7"/>
+  <rect x="${width * 0.12}" y="${height * 0.39}" width="${width * 0.34}" height="14" rx="7" fill="#475569" opacity="0.7"/>
+  <rect x="${width * 0.12}" y="${height * 0.52}" width="${width * 0.4}" height="${height * 0.12}" rx="18" fill="#111827" stroke="#334155"/>
+  <path d="M${width * 0.15} ${height * 0.59} C${width * 0.24} ${height * 0.5}, ${width * 0.36} ${height * 0.68}, ${width * 0.49} ${height * 0.55}" fill="none" stroke="url(#accent)" stroke-width="6" stroke-linecap="round">
+    <animate attributeName="stroke-dasharray" values="10 28;28 10;10 28" dur="3s" repeatCount="indefinite"/>
+  </path>
+  <g transform="translate(${width * 0.63} ${height * 0.36})">
+    <circle cx="0" cy="0" r="34" fill="#a78bfa"/><circle cx="${width * 0.1}" cy="${height * 0.08}" r="28" fill="#38bdf8"/><circle cx="${width * 0.18}" cy="${height * 0.02}" r="32" fill="#34d399"/>
+    <path d="M0 0 L${width * 0.1} ${height * 0.08} L${width * 0.18} ${height * 0.02}" fill="none" stroke="#ffffff" stroke-width="3" opacity="0.7"/>
+  </g>
+  <text x="${width * 0.08}" y="${height * 0.84}" fill="#f8fafc" font-family="Inter, Arial, sans-serif" font-size="${Math.max(34, width * 0.045)}" font-weight="700">${brand}</text>
+  <text x="${width * 0.08}" y="${height * 0.9}" fill="#cbd5e1" font-family="Inter, Arial, sans-serif" font-size="${Math.max(18, width * 0.018)}">Demo generated visual: ${prompt}</text>
+</svg>`
+  return `data:image/svg+xml;base64,${Buffer.from(svg).toString('base64')}`
+}
+
+export function buildDemoMarketingImage(input: {
+  prompt: string
+  brandProfile?: BrandProfile
+  aspectRatio?: string
+  enhancedPrompt?: string
+  promptModelLabel?: string
+}): GeneratedImage {
+  return {
+    id: id('img-demo'),
+    prompt: input.prompt,
+    enhancedPrompt: input.enhancedPrompt || input.prompt,
+    style: 'animated demo visual',
+    aspectRatio: input.aspectRatio || '16:9',
+    imageUrl: buildDemoImageDataUrl(input),
+    model: `demo-poster${input.promptModelLabel ? ` - ${input.promptModelLabel}` : ''}`,
+    provider: 'Demo fallback',
+    status: 'completed',
+    createdAt: new Date().toISOString(),
+  }
+}
+
+export function buildDemoMarketingVideo(input: {
+  prompt: string
+  duration?: number
+  aspectRatio?: string
+}): GeneratedVideo {
+  return {
+    id: id('vid-demo'),
+    prompt: input.prompt,
+    model: 'demo-motion-card',
+    provider: 'Demo animation',
+    duration: input.duration ?? 5,
+    aspectRatio: input.aspectRatio || '9:16',
+    status: 'completed',
+    createdAt: new Date().toISOString(),
+  }
+}
+
 function resolvePromptModelId(
   explicit?: ImagePromptModelId,
   modelRouting?: ModelRouting[],
@@ -152,20 +260,32 @@ export async function generateMarketingImage(input: {
 }): Promise<GeneratedImage> {
   const preferredRenderModelId = resolveRenderModelId(input.renderModel)
   let usedRenderModelId: ImageRenderModelId | string = preferredRenderModelId
-  const renderProvider = getImageRenderProvider(preferredRenderModelId) || 'pollinations'
 
   const theme = resolveBrandTheme(input.brandProfile, input.brandThemeId)
   const brandContext = buildBrandContext(input.brandProfile, theme)
+  const promptErrors: string[] = []
   const { brief, promptModelLabel } = await buildImageBrief({
-    prompt: input.prompt,
-    brandContext,
-    customPromptDetails: input.customPromptDetails,
-    promptModel: input.promptModel,
-    modelRouting: input.modelRouting,
-    brandProfile: input.brandProfile,
-    research: input.research,
-    signals: input.signals,
-  })
+      prompt: input.prompt,
+      brandContext,
+      customPromptDetails: input.customPromptDetails,
+      promptModel: input.promptModel,
+      modelRouting: input.modelRouting,
+      brandProfile: input.brandProfile,
+      research: input.research,
+      signals: input.signals,
+    })
+    .catch((err) => {
+      promptErrors.push(err instanceof Error ? err.message : String(err))
+      return {
+        brief: {
+          enhancedPrompt: `${input.prompt}. ${brandContext}`,
+          style: 'demo visual',
+          aspectRatio: (input.aspectRatio || '16:9') as KimiImagePrompt['aspectRatio'],
+          negativePrompt: 'blurry, low quality, watermark',
+        },
+        promptModelLabel: 'demo-prompt',
+      }
+    })
 
   const aspectRatio = input.aspectRatio || brief.aspectRatio
   let imageUrl: string | undefined
@@ -268,17 +388,14 @@ export async function generateMarketingImage(input: {
   }
 
   if (!imageUrl) {
-    if (renderProvider === 'openai' && !hasOpenAIImage() && !isPollinationsRenderModel(preferredRenderModelId)) {
-      throw new Error('OPENAI_API_KEY is required for OpenAI image models. Add it to your .env.local file.')
-    }
-    if (renderProvider === 'openrouter' && !hasOpenRouter()) {
-      throw new Error('OPENROUTER_API_KEY is required for OpenRouter image models. Add it to your .env.local file.')
-    }
-    throw new Error(
-      renderErrors.length
-        ? `Image render failed — ${renderErrors.join('; ')}`
-        : `Unknown or unavailable image render model: ${preferredRenderModelId}`,
-    )
+    console.warn('[image-layer] using demo fallback:', [...promptErrors, ...renderErrors].join('; ') || 'no renderer returned an image')
+    return buildDemoMarketingImage({
+      prompt: input.prompt,
+      brandProfile: input.brandProfile,
+      aspectRatio,
+      enhancedPrompt: brief.enhancedPrompt,
+      promptModelLabel,
+    })
   }
 
   const modelLabel = `${usedRenderModelId} · ${promptModelLabel}`
@@ -327,9 +444,11 @@ export async function generateMarketingVideo(input: {
   })
 
   if (!layerChain.length) {
-    throw new Error(
-      'No video provider configured. Add OPENROUTER_API_KEY and/or PIXVERSE_API_KEY to your .env.local file.',
-    )
+    return buildDemoMarketingVideo({
+      prompt: input.prompt,
+      duration: input.duration,
+      aspectRatio: input.aspectRatio,
+    })
   }
 
   const theme = resolveBrandTheme(input.brandProfile, input.brandThemeId)
@@ -407,7 +526,12 @@ export async function generateMarketingVideo(input: {
     }
   }
 
-  throw new Error(errors.length ? `Video generation failed — ${errors.join('; ')}` : 'Video generation failed')
+  console.warn('[video-layer] using demo fallback:', errors.join('; ') || 'no provider returned a video')
+  return buildDemoMarketingVideo({
+    prompt: input.prompt,
+    duration,
+    aspectRatio,
+  })
 }
 
 export function mediaProvidersAvailable() {

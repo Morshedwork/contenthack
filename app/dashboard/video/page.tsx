@@ -48,6 +48,42 @@ import { toast } from 'sonner'
 
 type ScriptFilter = 'all' | 'content' | 'promotion' | 'topic'
 
+function isDemoVideo(video?: GeneratedVideo | null) {
+  return Boolean(video?.provider.toLowerCase().includes('demo'))
+}
+
+function DemoVideoPreview({ video }: { video: GeneratedVideo }) {
+  return (
+    <div className="relative mx-auto flex aspect-[9/16] w-full max-w-sm overflow-hidden rounded-xl border border-violet-500/25 bg-slate-950">
+      <div className="absolute inset-0 bg-[radial-gradient(circle_at_30%_20%,rgba(167,139,250,0.35),transparent_32%),radial-gradient(circle_at_78%_18%,rgba(56,189,248,0.24),transparent_30%),linear-gradient(145deg,rgba(15,23,42,0.4),rgba(88,28,135,0.24))]" />
+      <div className="absolute inset-x-6 top-8 h-24 rounded-2xl border border-white/10 bg-white/10 backdrop-blur">
+        <div className="m-4 h-3 w-28 rounded-full bg-violet-300/80" />
+        <div className="mx-4 mt-3 h-2 w-40 rounded-full bg-white/25" />
+        <div className="mx-4 mt-2 h-2 w-24 rounded-full bg-white/20" />
+      </div>
+      <div className="absolute inset-x-7 bottom-24 grid grid-cols-3 gap-2">
+        {[0, 1, 2].map((item) => (
+          <span
+            key={item}
+            className="h-16 rounded-xl border border-white/10 bg-white/10 animate-pulse"
+            style={{ animationDelay: `${item * 180}ms` }}
+          />
+        ))}
+      </div>
+      <div className="absolute left-1/2 top-1/2 size-28 -translate-x-1/2 -translate-y-1/2 rounded-full border border-cyan-300/40 bg-cyan-300/15 shadow-[0_0_48px_rgba(34,211,238,0.35)] animate-pulse" />
+      <div className="absolute inset-x-8 bottom-8">
+        <div className="mb-3 flex items-center justify-between text-[10px] text-white/70">
+          <span>{video.provider}</span>
+          <span>{video.duration}s demo</span>
+        </div>
+        <div className="h-1.5 overflow-hidden rounded-full bg-white/15">
+          <div className="h-full w-2/3 rounded-full bg-gradient-to-r from-violet-300 via-cyan-300 to-emerald-300 animate-pulse" />
+        </div>
+      </div>
+    </div>
+  )
+}
+
 export default function VideoStudioPage() {
   const { data, refresh } = useWorkspace()
   const [scripts, setScripts] = useState<VideoScript[]>([])
@@ -187,6 +223,37 @@ export default function VideoStudioPage() {
       )
     } catch (err) {
       toast.error(err instanceof Error ? err.message : 'Failed to generate video')
+    } finally {
+      setVideoLoading(false)
+    }
+  }
+
+  const handleGenerateDemoVideo = async () => {
+    const prompt =
+      videoPrompt.trim() ||
+      scripts[0]?.aiVideoPrompt ||
+      topic.trim() ||
+      'Animated ContentOps AI product demo with agent workflow, image generation, video generation, approvals, leads, and ROI dashboard'
+    setVideoLoading(true)
+    try {
+      const res = await fetch('/api/media/video/generate', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          prompt,
+          aspectRatio,
+          duration: isPixverseOnly ? videoDuration : openRouterDuration,
+          demoFallback: true,
+        }),
+      })
+      const json = await res.json()
+      if (!json.success) throw new Error(json.error || 'Demo video generation failed')
+      setLatestVideo(json.data.video)
+      setVideos(json.data.videos)
+      await refresh()
+      toast.success('Demo animation generated')
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Failed to generate demo animation')
     } finally {
       setVideoLoading(false)
     }
@@ -550,6 +617,18 @@ export default function VideoStudioPage() {
               <div className="flex flex-wrap justify-end gap-2">
                 <Button
                   variant="outline"
+                  onClick={() => void handleGenerateDemoVideo()}
+                  disabled={batchVideoLoading || videoLoading}
+                >
+                  {videoLoading ? (
+                    <Loader2 className="animate-spin" data-icon="inline-start" />
+                  ) : (
+                    <Sparkles data-icon="inline-start" />
+                  )}
+                  Demo Animation
+                </Button>
+                <Button
+                  variant="outline"
                   onClick={() => void handleBatchGenerateVideos()}
                   disabled={batchVideoLoading || videoLoading}
                 >
@@ -574,7 +653,7 @@ export default function VideoStudioPage() {
             </CardContent>
           </Card>
 
-          {latestVideo?.videoUrl && (
+          {latestVideo && (latestVideo.videoUrl || isDemoVideo(latestVideo)) && (
             <Card className="mb-6">
               <CardHeader>
                 <CardTitle className="text-base flex items-center gap-2">
@@ -583,11 +662,15 @@ export default function VideoStudioPage() {
                 </CardTitle>
               </CardHeader>
               <CardContent>
-                <video
-                  src={latestVideo.videoUrl}
-                  controls
-                  className="w-full max-w-sm mx-auto rounded-xl border border-border/60"
-                />
+                {latestVideo?.videoUrl ? (
+                  <video
+                    src={latestVideo.videoUrl}
+                    controls
+                    className="w-full max-w-sm mx-auto rounded-xl border border-border/60"
+                  />
+                ) : latestVideo ? (
+                  <DemoVideoPreview video={latestVideo} />
+                ) : null}
                 <p className="text-xs text-muted-foreground mt-3 text-center">{latestVideo.prompt}</p>
               </CardContent>
             </Card>
@@ -600,6 +683,10 @@ export default function VideoStudioPage() {
                   <CardContent className="p-4">
                     {v.videoUrl ? (
                       <video src={v.videoUrl} controls className="w-full rounded-lg mb-3 max-h-64" />
+                    ) : isDemoVideo(v) ? (
+                      <div className="mb-3">
+                        <DemoVideoPreview video={v} />
+                      </div>
                     ) : (
                       <div className="aspect-[9/16] max-h-64 bg-secondary/40 rounded-lg flex items-center justify-center mb-3">
                         <Badge variant="outline">{v.status}</Badge>

@@ -58,6 +58,20 @@ export function CommandCenter() {
     }
   }
 
+  const handleRunDemoFlow = async () => {
+    setRunning(true)
+    try {
+      const result = await runFullWorkflow(customPromptDetails.trim() || undefined, { demoFast: true })
+      setAgents(result.agents)
+      await refreshWorkspace()
+      toast.success(`Demo flow complete - saved ~${result.estimatedTimeSaved}`)
+    } catch (err) {
+      toast.error(err instanceof Error ? err.message : 'Demo workflow failed')
+    } finally {
+      setRunning(false)
+    }
+  }
+
   const handleRunAgent = async (id: string) => {
     setRunningAgentId(id)
     setAgents((prev) =>
@@ -109,7 +123,11 @@ export function CommandCenter() {
       </Card>
 
       <div className="flex flex-wrap gap-2">
-        <Button onClick={() => void handleRunAll()} disabled={running || loading}>
+        <Button onClick={() => void handleRunDemoFlow()} disabled={running || loading}>
+          {running ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <Play data-icon="inline-start" />}
+          Run Demo Flow
+        </Button>
+        <Button variant="outline" onClick={() => void handleRunAll()} disabled={running || loading}>
           {running ? <Loader2 className="animate-spin" data-icon="inline-start" /> : <Play data-icon="inline-start" />}
           Run Full Workflow
         </Button>

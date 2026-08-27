@@ -12,6 +12,7 @@ import {
   MessageSquare,
   Mic,
   Plug,
+  Presentation,
   Search,
   Send,
   Settings,
@@ -40,6 +41,7 @@ export const dashboardNavGroups: NavGroup[] = [
     label: 'Workspace',
     items: [
       { label: 'Overview', href: '/dashboard', icon: LayoutDashboard, description: 'Campaign snapshot & KPIs', keywords: ['home', 'dashboard'] },
+      { label: 'Demo Dashboard', href: '/dashboard/demo', icon: Presentation, description: 'Guided campaign story & previews', keywords: ['demo', 'preview', 'showcase'] },
       { label: 'Campaign Builder', href: '/dashboard/campaign-builder', icon: Target, description: 'Configure your campaign', keywords: ['campaign', 'setup'] },
     ],
   },

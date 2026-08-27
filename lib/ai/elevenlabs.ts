@@ -13,8 +13,8 @@ import { ttsModelForLanguage } from '@/lib/voice/languages'
  */
 const ELEVENLABS_BASE = 'https://api.elevenlabs.io/v1'
 
-/** "Rachel" — ElevenLabs' default professional narrator voice. */
-export const DEFAULT_VOICE_ID = '21m00Tcm4TlvDq8ikWAM'
+/** "Sarah" — premade voice available to free ElevenLabs API accounts. */
+export const DEFAULT_VOICE_ID = 'EXAVITQu4vr4xnSDxMaL'
 export const DEFAULT_TTS_MODEL = 'eleven_turbo_v2_5'
 
 function getApiKey(): string | undefined {

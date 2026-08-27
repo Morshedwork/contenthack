@@ -9,14 +9,16 @@ import {
   computeDynamicROI,
   updateContentDraftStatus,
 } from '@/lib/workspace/store'
+import { resolveApiWorkspaceContext } from '@/lib/workspace/api-context'
 import type { DemoPresetId } from '@/lib/demo/presets'
 import type { BrandProfile, Campaign, ContentStatus, SafetySettings } from '@/types'
 
 const PRESET_IDS = new Set<DemoPresetId>(['default', 'investor-pitch', 'empty'])
 
-export async function GET() {
+export async function GET(request: Request) {
   try {
-    const ws = await getWorkspace()
+    const ctx = await resolveApiWorkspaceContext(request)
+    const ws = await getWorkspace(ctx)
     return apiSuccess({
       ...ws,
       roi: computeDynamicROI(ws),
@@ -31,10 +33,11 @@ export async function GET() {
 export async function PATCH(request: Request) {
   try {
     const body = await request.json().catch(() => ({}))
+    const ctx = await resolveApiWorkspaceContext(request)
 
     if (body.action === 'reset') {
-      await resetWorkspace()
-      const ws = await getWorkspace()
+      await resetWorkspace(ctx)
+      const ws = await getWorkspace(ctx)
       return apiSuccess({
         ...ws,
         roi: computeDynamicROI(ws),
@@ -44,8 +47,8 @@ export async function PATCH(request: Request) {
     }
 
     if (body.action === 'loadPreset' && typeof body.preset === 'string' && PRESET_IDS.has(body.preset as DemoPresetId)) {
-      await loadDemoPreset(body.preset as DemoPresetId)
-      const ws = await getWorkspace()
+      await loadDemoPreset(body.preset as DemoPresetId, ctx)
+      const ws = await getWorkspace(ctx)
       return apiSuccess({
         ...ws,
         roi: computeDynamicROI(ws),
@@ -55,8 +58,8 @@ export async function PATCH(request: Request) {
     }
 
     if (body.action === 'updateApproval' && body.draftId && body.status) {
-      await updateContentDraftStatus(body.draftId as string, body.status as ContentStatus)
-      const ws = await getWorkspace()
+      await updateContentDraftStatus(body.draftId as string, body.status as ContentStatus, ctx)
+      const ws = await getWorkspace(ctx)
       return apiSuccess({
         ...ws,
         approvalItems: buildApprovalItems(ws),
@@ -64,39 +67,39 @@ export async function PATCH(request: Request) {
     }
 
     if (body.brandProfile) {
-      await patchWorkspace({ brandProfile: body.brandProfile as BrandProfile })
+      await patchWorkspace({ brandProfile: body.brandProfile as BrandProfile }, ctx)
     }
 
     if (body.safetySettings) {
-      await patchWorkspace({ safetySettings: body.safetySettings as SafetySettings })
+      await patchWorkspace({ safetySettings: body.safetySettings as SafetySettings }, ctx)
     }
 
     if (body.integrations) {
-      await patchWorkspace({ integrations: body.integrations })
+      await patchWorkspace({ integrations: body.integrations }, ctx)
     }
 
     if (body.modelRouting) {
-      await patchWorkspace({ modelRouting: body.modelRouting })
+      await patchWorkspace({ modelRouting: body.modelRouting }, ctx)
     }
 
     if (body.models) {
-      await patchWorkspace({ models: body.models })
+      await patchWorkspace({ models: body.models }, ctx)
     }
 
     if (body.campaign) {
-      const ws = await getWorkspace()
-      await patchWorkspace({ campaign: { ...ws.campaign, ...(body.campaign as Partial<Campaign>) } })
+      const ws = await getWorkspace(ctx)
+      await patchWorkspace({ campaign: { ...ws.campaign, ...(body.campaign as Partial<Campaign>) } }, ctx)
     }
 
     if (body.contentDrafts) {
-      await patchWorkspace({ contentDrafts: body.contentDrafts })
+      await patchWorkspace({ contentDrafts: body.contentDrafts }, ctx)
     }
 
     if (body.calendarPosts) {
-      await patchWorkspace({ calendarPosts: body.calendarPosts })
+      await patchWorkspace({ calendarPosts: body.calendarPosts }, ctx)
     }
 
-    const ws = await getWorkspace()
+    const ws = await getWorkspace(ctx)
     return apiSuccess({
       ...ws,
       roi: computeDynamicROI(ws),
@@ -111,9 +114,10 @@ export async function PATCH(request: Request) {
 export async function POST(request: Request) {
   try {
     const body = await request.json().catch(() => ({}))
+    const ctx = await resolveApiWorkspaceContext(request)
     if (body.action !== 'reset') return apiError('Unknown action', 400)
-    await resetWorkspace()
-    const ws = await getWorkspace()
+    await resetWorkspace(ctx)
+    const ws = await getWorkspace(ctx)
     return apiSuccess(ws)
   } catch (err) {
     return apiFromError(err, 'Failed to reset workspace')

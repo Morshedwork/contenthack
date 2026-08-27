@@ -1,14 +1,32 @@
+import { readFile, writeFile } from 'fs/promises'
+import { join } from 'path'
 import { createAdminClient } from '@/lib/supabase/admin'
 import { getSupabaseServiceEnv } from '@/lib/supabase/env'
 import { isDemoMode } from '@/lib/demo/mode'
+import { DEMO_WORKSPACE_ID } from '@/lib/workspace/context'
 import type { WorkspaceState } from '@/lib/workspace/store'
+
+const DEMO_STATE_FILE = join(process.cwd(), '.contentops-demo-workspace.json')
 
 /** True when service role + DB persistence are configured (not demo-only in-memory). */
 export function hasSupabasePersistence(): boolean {
   return !isDemoMode() && getSupabaseServiceEnv() !== null
 }
 
+async function loadDemoWorkspaceState(): Promise<WorkspaceState | null> {
+  try {
+    return JSON.parse(await readFile(DEMO_STATE_FILE, 'utf8')) as WorkspaceState
+  } catch {
+    return null
+  }
+}
+
+async function saveDemoWorkspaceState(state: WorkspaceState): Promise<void> {
+  await writeFile(DEMO_STATE_FILE, JSON.stringify(state, null, 2), 'utf8')
+}
+
 export async function loadWorkspaceState(workspaceId: string): Promise<WorkspaceState | null> {
+  if (workspaceId === DEMO_WORKSPACE_ID) return loadDemoWorkspaceState()
   if (isDemoMode()) return null
 
   try {
@@ -33,6 +51,10 @@ export async function loadWorkspaceState(workspaceId: string): Promise<Workspace
 }
 
 export async function saveWorkspaceState(workspaceId: string, state: WorkspaceState): Promise<void> {
+  if (workspaceId === DEMO_WORKSPACE_ID) {
+    await saveDemoWorkspaceState(state)
+    return
+  }
   if (isDemoMode()) return
 
   if (!hasSupabasePersistence()) {
